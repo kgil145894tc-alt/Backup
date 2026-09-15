@@ -1,0 +1,66 @@
+{
+  "type": "FeatureCollection",
+  "name": "buildings",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "ob",
+        "name": "Old Building",
+        "type": "building",
+        "category": "Building",
+        "floors": 3,
+        "description": "AVR-2, R-302, R-301, V1, V3, V2, Electronics Laboratory, Engineering Computer Lab"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[125.79360864702215, 7.425559278447803], [125.79385291541799, 7.425370035507669], [125.79392238236949, 7.425456354366204], [125.7936763045781, 7.425646999068131], [125.79360864702215, 7.425559278447803]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "b2",
+        "name": "Building B2",
+        "type": "building",
+        "category": "Building",
+        "floors": 3,
+        "description": "313 - 318, 212 - 207, 101 - 106"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[125.7943202363609, 7.425737566617313], [125.79440708734606, 7.425670280275217], [125.79404931432495, 7.425216885370134], [125.79396281675346, 7.425284620337203], [125.7943202363609, 7.425737566617313]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "cr1-building",
+        "name": "Comfort Room Building",
+        "type": "building",
+        "category": "Building",
+        "floors": 3,
+        "description": "Restroom for male, female, and PWD"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[125.79385295959497, 7.425370091577128], [125.79396276020985, 7.425284664143478], [125.79403130480569, 7.425372239366515], [125.79392243891336, 7.425456310559978], [125.79385295959497, 7.425370091577128]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "b1",
+        "name": "Building B1",
+        "type": "building",
+        "category": "Building",
+        "floors": 3,
+        "description": "309 - 312, 205 - 208, 101 - 104"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[125.7942243237327, 7.426080380181122], [125.79429516634417, 7.426171281325364], [125.79451494496497, 7.426001011678167], [125.79444262303991, 7.425909713870107], [125.7942243237327, 7.426080380181122]]]
+      }
+    }
+  ]
+}

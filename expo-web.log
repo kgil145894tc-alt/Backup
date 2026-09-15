@@ -1,0 +1,27 @@
+Starting project at C:\Users\kirlg\UMVCFIND
+Using src/app as the root directory for Expo Router.
+ ERROR  An unknown error occurred while installing React Native DevTools. Details:
+
+spawn EPERM
+Starting Metro Bundler
+
+Waiting on http://localhost:8082
+
+Logs for your project will appear below.
+| (node:16280) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:16280) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:16280) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+λ Bundled 48739ms node_modules\expo\node_modules\@expo\cli\node_modules\@expo\router-server\node\render.js (1468 modules)
+Web Bundled 68160ms node_modules\expo-router\entry.js (1309 modules)
+λ Bundled 160ms node_modules\expo\node_modules\@expo\cli\node_modules\@expo\router-server\node\render.js (1 module)
+Web Bundled 1388ms node_modules\expo-router\entry.js (1 module)
+Web Bundled 41668ms node_modules\expo-router\entry.js (1309 modules)
+UnexpectedServerError: connect ECONNREFUSED 127.0.0.1:9
+UnexpectedServerError: connect ECONNREFUSED 127.0.0.1:9
+UnexpectedServerError: connect ECONNREFUSED 127.0.0.1:9
+UnexpectedServerError: connect ECONNREFUSED 127.0.0.1:9
+UnexpectedServerError: connect ECONNREFUSED 127.0.0.1:9
+UnexpectedServerError: connect ECONNREFUSED 127.0.0.1:9
