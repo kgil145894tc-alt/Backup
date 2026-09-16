@@ -27,6 +27,7 @@ const mapFeatures = campusFeatureSummaries.map((feature) => ({
   name: feature.name,
   category: feature.category,
   type: feature.type,
+  aliases: feature.aliases ?? [],
 }));
 
 export default function SearchScreen() {
@@ -48,7 +49,10 @@ export default function SearchScreen() {
         feature.name.toLowerCase().includes(trimmedSearch) ||
         feature.featureId.toLowerCase().includes(trimmedSearch) ||
         feature.type.toLowerCase().includes(trimmedSearch) ||
-        feature.category.toLowerCase().includes(trimmedSearch),
+        feature.category.toLowerCase().includes(trimmedSearch) ||
+        feature.aliases.some((alias) =>
+          alias.toLowerCase().includes(trimmedSearch),
+        ),
     );
   }, [isSearching, trimmedSearch]);
 
@@ -77,7 +81,7 @@ export default function SearchScreen() {
       void saveGuestHistoryItem(feature).then(setRecentSearches);
 
       router.push({
-        pathname: "/(tabs)/map",
+        pathname: "/(tabs)/location-details",
         params: {
           featureId: feature.featureId,
           featureType: feature.featureType,

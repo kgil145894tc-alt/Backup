@@ -32,9 +32,17 @@ export default function TabLayout() {
       />
 
       <Tabs.Screen
-        name="history"
+        name="profile"
         options={{
           title: "Profile",
+        }}
+      />
+
+      <Tabs.Screen
+        name="location-details"
+        options={{
+          href: null,
+          title: "Location Details",
         }}
       />
     </Tabs>

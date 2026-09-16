@@ -70,8 +70,14 @@ export type SelectedMapFeature = {
   name: string;
   type: CampusFeatureType;
   category: CampusFeatureCategory;
+  aliases?: string[];
+  accessibility?: string;
+  directions?: string;
+  floor?: string;
   floors?: number | string;
+  nearby?: string;
   description?: string;
+  photoKey?: string;
 };
 
 export type CurrentMapLocation = {

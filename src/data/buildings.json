@@ -10,7 +10,7 @@
         "type": "building",
         "category": "Building",
         "floors": 3,
-        "description": "AVR-2, R-302, R-301, V1, V3, V2, Electronics Laboratory, Engineering Computer Lab"
+        "description": "Three-storey academic building with the Electronics and Engineering Computer laboratories on the First Floor; V1, V2, and V3 Computing Laboratories on the Second Floor; and R-301, R-302, and AVR-2 on the Third Floor."
       },
       "geometry": {
         "type": "Polygon",
@@ -25,7 +25,7 @@
         "type": "building",
         "category": "Building",
         "floors": 3,
-        "description": "313 - 318, 212 - 207, 101 - 106"
+        "description": "Three-storey academic building with B2-101 to B2-105 and B2-108 on the First Floor; the Defense Room and B2-207 to B2-212 on the Second Floor; and PPMGS Visayan with B2-313 to B2-318 on the Third Floor."
       },
       "geometry": {
         "type": "Polygon",
@@ -40,7 +40,7 @@
         "type": "building",
         "category": "Building",
         "floors": 3,
-        "description": "Restroom for male, female, and PWD"
+        "description": "Three-storey restroom building. Campus data lists male, female, and PWD restroom access; confirm availability on site."
       },
       "geometry": {
         "type": "Polygon",
@@ -55,7 +55,7 @@
         "type": "building",
         "category": "Building",
         "floors": 3,
-        "description": "309 - 312, 205 - 208, 101 - 104"
+        "description": "Three-storey academic building with B1-101 to B1-104 on the First Floor; B1-205 to B1-208 on the Second Floor; and B1-309, B1-311, and B1-312 on the Third Floor."
       },
       "geometry": {
         "type": "Polygon",

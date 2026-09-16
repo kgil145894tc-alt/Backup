@@ -121,7 +121,7 @@ export default function Categories() {
             style={styles.resultItem}
             onPress={() =>
               router.push({
-                pathname: "/(tabs)/map",
+                pathname: "/(tabs)/location-details",
                 params: {
                   featureId: feature.properties.id,
                   featureType: feature.properties.type,
