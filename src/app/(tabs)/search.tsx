@@ -9,7 +9,10 @@ import {
   View,
 } from "react-native";
 
-import { campusFeatureSummaries } from "../../data/campusData";
+import ProtectedAccess from "../../../components/ProtectedAccess";
+import {
+  loadCampusData,
+} from "../../services/campusDataStore";
 import {
   getGuestHistory,
   saveGuestHistoryItem,
@@ -20,18 +23,13 @@ import type {
 } from "../../utils/guestHistory";
 
 type SearchResultItem = SaveGuestHistoryItem | GuestHistoryItem;
-
-const mapFeatures = campusFeatureSummaries.map((feature) => ({
-  featureId: feature.id,
-  featureType: feature.type,
-  name: feature.name,
-  category: feature.category,
-  type: feature.type,
-  aliases: feature.aliases ?? [],
-}));
+type SearchFeatureItem = SaveGuestHistoryItem & {
+  aliases: string[];
+};
 
 export default function SearchScreen() {
   const [searchText, setSearchText] = useState("");
+  const [mapFeatures, setMapFeatures] = useState<SearchFeatureItem[]>([]);
   const [recentSearches, setRecentSearches] = useState<
     GuestHistoryItem[]
   >([]);
@@ -61,9 +59,20 @@ export default function SearchScreen() {
       let isActive = true;
 
       async function loadRecentSearches() {
-        const nextRecentSearches = await getGuestHistory();
+        const [nextRecentSearches, campusData] =
+          await Promise.all([getGuestHistory(), loadCampusData()]);
 
         if (isActive) {
+          setMapFeatures(
+            campusData.visibleLocations.map((feature) => ({
+              featureId: feature.id,
+              featureType: feature.type,
+              name: feature.name,
+              category: feature.category,
+              type: feature.type,
+              aliases: feature.aliases ?? [],
+            })),
+          );
           setRecentSearches(nextRecentSearches);
         }
       }
@@ -81,10 +90,11 @@ export default function SearchScreen() {
       void saveGuestHistoryItem(feature).then(setRecentSearches);
 
       router.push({
-        pathname: "/(tabs)/location-details",
+        pathname: "/(tabs)/map",
         params: {
           featureId: feature.featureId,
           featureType: feature.featureType,
+          locateOnly: "1",
         },
       });
     },
@@ -96,7 +106,8 @@ export default function SearchScreen() {
     : recentSearches;
 
   return (
-    <View style={styles.container}>
+    <ProtectedAccess>
+      <View style={styles.container}>
       <Text style={styles.heading}>Search</Text>
 
       <TextInput
@@ -137,7 +148,8 @@ export default function SearchScreen() {
           </Pressable>
         )}
       />
-    </View>
+      </View>
+    </ProtectedAccess>
   );
 }
 

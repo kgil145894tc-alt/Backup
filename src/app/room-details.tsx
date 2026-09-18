@@ -1,14 +1,18 @@
-import { router, useLocalSearchParams } from "expo-router";
-import { useMemo } from "react";
+import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
+import { useCallback, useMemo, useState } from "react";
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import FloorPlan from "../../components/FloorPlan";
 import {
   campusFeatureSummaries,
   getBuildingIdForRoom,
-  getBuildingRoom,
-  getBuildingRooms,
+  type BuildingRoom,
 } from "../data/campusData";
+import { loadCampusData } from "../services/campusDataStore";
+import {
+  getEditedBuildingRoom,
+  getEditedBuildingRooms,
+} from "../utils/adminRooms";
 
 const sampleClassroomPhoto =
   "https://images.unsplash.com/photo-1503676260728-1c00da094a0b?auto=format&fit=crop&w=1200&q=80";
@@ -20,11 +24,19 @@ export default function RoomDetailsScreen() {
     featureId?: string;
     featureType?: string;
   }>();
+  const [roomEdits, setRoomEdits] = useState<Record<string, BuildingRoom>>({});
   const resolvedBuildingId = buildingId || (featureId ? getBuildingIdForRoom(featureId) : undefined);
   const requestedRoomId = roomId ?? featureId;
   const mappedRoom = useMemo(
-    () => (resolvedBuildingId && requestedRoomId ? getBuildingRoom(resolvedBuildingId, requestedRoomId) : undefined),
-    [resolvedBuildingId, requestedRoomId],
+    () =>
+      resolvedBuildingId && requestedRoomId
+        ? getEditedBuildingRoom(
+            resolvedBuildingId,
+            requestedRoomId,
+            roomEdits,
+          )
+        : undefined,
+    [resolvedBuildingId, requestedRoomId, roomEdits],
   );
   const room = useMemo(
     () => mappedRoom ?? campusFeatureSummaries.find((feature) => feature.id === featureId && feature.type === featureType),
@@ -37,9 +49,31 @@ export default function RoomDetailsScreen() {
   const floorRooms = useMemo(
     () =>
       resolvedBuildingId && mappedRoom
-        ? getBuildingRooms(resolvedBuildingId, mappedRoom.floorNumber)
+        ? getEditedBuildingRooms(
+            resolvedBuildingId,
+            roomEdits,
+            mappedRoom.floorNumber,
+          )
         : [],
-    [mappedRoom, resolvedBuildingId],
+    [mappedRoom, resolvedBuildingId, roomEdits],
+  );
+  const mapFeatureId = mappedRoom?.mapFeatureId ?? room?.id ?? "";
+  const mapFeatureType = mappedRoom?.mapFeatureType ?? room?.type ?? "";
+
+  useFocusEffect(
+    useCallback(() => {
+      let isActive = true;
+
+      void loadCampusData().then((snapshot) => {
+        if (isActive) {
+          setRoomEdits(snapshot.roomEdits);
+        }
+      });
+
+      return () => {
+        isActive = false;
+      };
+    }, []),
   );
 
   if (!room) {
@@ -91,12 +125,27 @@ export default function RoomDetailsScreen() {
         </Pressable>
       ) : null}
 
+      <Pressable
+        style={styles.button}
+        onPress={() =>
+          router.push({
+            pathname: "/(tabs)/map",
+            params: {
+              featureId: mapFeatureId,
+              featureType: mapFeatureType,
+              locateOnly: "1",
+            },
+          })
+        }
+      >
+        <Text style={styles.buttonText}>View on Map</Text>
+      </Pressable>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { padding: 20, paddingBottom: 32 },
+  container: { paddingHorizontal: 20, paddingBottom: 32, paddingTop: 44 },
   center: { flex: 1, justifyContent: "center", alignItems: "center", gap: 16, padding: 24 },
   title: { color: "#111827", fontSize: 24, fontWeight: "700" },
   meta: { color: "#6b7280", marginTop: 6 },

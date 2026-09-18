@@ -194,9 +194,12 @@ const mappedFeatureBuildingIds: Record<string, string> = {
   chem: "b1",
   "physical-laboratory": "b1",
   rv1: "b1",
+  cr2: "ob",
   "psychology-lab": "b2",
   "psychology-faculty": "b2",
   faculty: "b2",
+  cr1: "b2",
+  cr3: "b1",
 };
 
 export function getBuildingRooms(

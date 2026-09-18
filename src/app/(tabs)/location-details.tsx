@@ -1,19 +1,29 @@
-import { router, useLocalSearchParams } from "expo-router";
-import { useEffect, useMemo } from "react";
+import {
+  router,
+  useFocusEffect,
+  useLocalSearchParams,
+} from "expo-router";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
+import { loadCampusData } from "../../services/campusDataStore";
 import {
-  campusFeatureSummaries,
-  getBuildingIdForRoom,
-} from "../../data/campusData";
+  initialAdminLocations,
+  isMaintenanceAdminLocation,
+  type AdminLocation,
+} from "../../utils/adminLocations";
 import { saveGuestHistoryItem } from "../../utils/guestHistory";
 
-function getFeatureFromParams(featureId?: string, featureType?: string) {
+function getFeatureFromParams(
+  features: AdminLocation[],
+  featureId?: string,
+  featureType?: string,
+) {
   if (!featureId || !featureType) {
     return undefined;
   }
 
-  return campusFeatureSummaries.find(
+  return features.find(
     (feature) => feature.id === featureId && feature.type === featureType,
   );
 }
@@ -23,15 +33,29 @@ export default function LocationDetailsScreen() {
     featureId?: string;
     featureType?: string;
   }>();
+  const [features, setFeatures] =
+    useState<AdminLocation[]>(initialAdminLocations);
+
+  useFocusEffect(
+    useCallback(() => {
+      let isActive = true;
+
+      void loadCampusData().then((snapshot) => {
+        if (isActive) {
+          setFeatures(snapshot.visibleLocations);
+        }
+      });
+
+      return () => {
+        isActive = false;
+      };
+    }, []),
+  );
 
   const feature = useMemo(
-    () => getFeatureFromParams(featureId, featureType),
-    [featureId, featureType],
+    () => getFeatureFromParams(features, featureId, featureType),
+    [featureId, featureType, features],
   );
-  const isRoomFeature =
-    feature?.type === "room" ||
-    feature?.type === "laboratory" ||
-    feature?.type === "faculty";
 
   useEffect(() => {
     if (!feature) {
@@ -72,6 +96,13 @@ export default function LocationDetailsScreen() {
     >
       <Text style={styles.eyebrow}>{feature.category}</Text>
       <Text style={styles.title}>{feature.name}</Text>
+      {isMaintenanceAdminLocation(feature) ? (
+        <View style={styles.statusNotice}>
+          <Text style={styles.statusNoticeText}>
+            This location is currently marked as under maintenance.
+          </Text>
+        </View>
+      ) : null}
 
       <View style={styles.detailGrid}>
         <View style={styles.detailItem}>
@@ -150,23 +181,12 @@ export default function LocationDetailsScreen() {
             return;
           }
 
-          if (isRoomFeature) {
-            router.push({
-              pathname: "/room-details",
-              params: {
-                buildingId: getBuildingIdForRoom(feature.id) ?? "",
-                featureId: feature.id,
-                featureType: feature.type,
-              },
-            });
-            return;
-          }
-
           router.push({
             pathname: "/(tabs)/map",
             params: {
               featureId: feature.id,
               featureType: feature.type,
+              locateOnly: "1",
             },
           });
         }}
@@ -174,9 +194,7 @@ export default function LocationDetailsScreen() {
         <Text style={styles.primaryButtonText}>
           {feature.type === "building"
             ? "View Floors and Rooms"
-            : isRoomFeature
-              ? "View Room Details"
-              : "View on Map"}
+            : "View on Map"}
         </Text>
       </Pressable>
     </ScrollView>
@@ -190,8 +208,9 @@ const styles = StyleSheet.create({
   },
 
   content: {
-    padding: 20,
+    paddingHorizontal: 20,
     paddingBottom: 36,
+    paddingTop: 44,
   },
 
   eyebrow: {
@@ -215,6 +234,22 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     gap: 10,
     marginBottom: 22,
+  },
+
+  statusNotice: {
+    backgroundColor: "#f3f4f6",
+    borderColor: "#d1d5db",
+    borderRadius: 8,
+    borderWidth: 1,
+    marginBottom: 18,
+    padding: 12,
+  },
+
+  statusNoticeText: {
+    color: "#374151",
+    fontSize: 14,
+    fontWeight: "800",
+    lineHeight: 20,
   },
 
   detailItem: {

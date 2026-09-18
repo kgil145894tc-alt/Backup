@@ -1,19 +1,45 @@
-import { router, useLocalSearchParams } from "expo-router";
-import { useMemo, useState } from "react";
+import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
+import { useCallback, useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { campusFeatureSummaries, getBuildingRooms } from "../data/campusData";
+import { loadCampusData } from "../services/campusDataStore";
+import { applyAdminRoomEdits } from "../utils/adminRooms";
+import type { BuildingRoom } from "../data/campusData";
 
 export default function BuildingFloorsScreen() {
   const { buildingId } = useLocalSearchParams<{ buildingId?: string }>();
   const [selectedFloor, setSelectedFloor] = useState(1);
+  const [roomEdits, setRoomEdits] = useState<Record<string, BuildingRoom>>({});
   const building = useMemo(
     () => campusFeatureSummaries.find((feature) => feature.id === buildingId && feature.type === "building"),
     [buildingId],
   );
   const rooms = useMemo(
-    () => (buildingId ? getBuildingRooms(buildingId, selectedFloor) : []),
-    [buildingId, selectedFloor],
+    () =>
+      buildingId
+        ? applyAdminRoomEdits(
+            getBuildingRooms(buildingId, selectedFloor),
+            roomEdits,
+          )
+        : [],
+    [buildingId, roomEdits, selectedFloor],
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      let isActive = true;
+
+      void loadCampusData().then((snapshot) => {
+        if (isActive) {
+          setRoomEdits(snapshot.roomEdits);
+        }
+      });
+
+      return () => {
+        isActive = false;
+      };
+    }, []),
   );
 
   if (!building) {
@@ -76,7 +102,7 @@ export default function BuildingFloorsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { padding: 20, paddingBottom: 32 },
+  container: { paddingHorizontal: 20, paddingBottom: 32, paddingTop: 44 },
   center: { flex: 1, justifyContent: "center", alignItems: "center", gap: 16, padding: 24 },
   title: { fontSize: 24, fontWeight: "700", color: "#111827" },
   subtitle: { marginTop: 6, color: "#4b5563", lineHeight: 20 },

@@ -1,22 +1,27 @@
-import { router, useLocalSearchParams } from "expo-router";
+import {
+  router,
+  useFocusEffect,
+  useLocalSearchParams,
+} from "expo-router";
 import * as Location from "expo-location";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import OSMMap from "../../../components/OSMMap";
-import {
-  campusFeatureSummaries,
-  getBuildingIdForRoom,
-} from "../../data/campusData";
+import { loadCampusData } from "../../services/campusDataStore";
 import type {
   CurrentMapLocation,
   SelectedMapFeature,
 } from "../../types/campus";
+import {
+  initialAdminLocations,
+  isMaintenanceAdminLocation,
+  type AdminLocation,
+} from "../../utils/adminLocations";
 import { saveGuestHistoryItem } from "../../utils/guestHistory";
 
-const mapFeatures = campusFeatureSummaries;
-
 function getFeatureFromParams(
+  mapFeatures: AdminLocation[],
   featureId?: string,
   featureType?: string,
 ) {
@@ -30,27 +35,67 @@ function getFeatureFromParams(
   );
 }
 
+function toAdminLocation(feature: SelectedMapFeature): AdminLocation {
+  return {
+    ...feature,
+    status: "Active",
+  };
+}
+
 export default function MapScreen() {
-  const { featureId, featureType } = useLocalSearchParams<{
+  const { featureId, featureType, category, locateOnly } = useLocalSearchParams<{
     featureId?: string;
     featureType?: string;
+    category?: string;
+    locateOnly?: string;
   }>();
+  const selectedCategory =
+    typeof category === "string" ? category : undefined;
+  const shouldOpenInitialSheet = locateOnly !== "1";
+  const [mapFeatures, setMapFeatures] =
+    useState<AdminLocation[]>(initialAdminLocations);
+  const [hiddenFeatureKeys, setHiddenFeatureKeys] = useState<string[]>([]);
 
   const initialSelectedFeature = useMemo(
-    () => getFeatureFromParams(featureId, featureType),
-    [featureId, featureType],
+    () =>
+      shouldOpenInitialSheet
+        ? getFeatureFromParams(mapFeatures, featureId, featureType)
+        : undefined,
+    [featureId, featureType, mapFeatures, shouldOpenInitialSheet],
   );
   const [selectedFeature, setSelectedFeature] = useState<
-    SelectedMapFeature | undefined
+    AdminLocation | undefined
   >(initialSelectedFeature);
   const [currentLocation, setCurrentLocation] = useState<
     CurrentMapLocation | undefined
   >();
   const [locationError, setLocationError] = useState<string | undefined>();
 
+  useFocusEffect(
+    useCallback(() => {
+      let isActive = true;
+
+      void loadCampusData().then((snapshot) => {
+        if (isActive) {
+          setMapFeatures(snapshot.visibleLocations);
+          setHiddenFeatureKeys(snapshot.hiddenLocationKeys);
+        }
+      });
+
+      return () => {
+        isActive = false;
+      };
+    }, []),
+  );
+
   useEffect(() => {
+    if (!shouldOpenInitialSheet) {
+      setSelectedFeature(undefined);
+      return;
+    }
+
     setSelectedFeature(initialSelectedFeature);
-  }, [initialSelectedFeature]);
+  }, [initialSelectedFeature, shouldOpenInitialSheet]);
 
   useEffect(() => {
     if (!initialSelectedFeature) {
@@ -66,24 +111,27 @@ export default function MapScreen() {
     });
   }, [initialSelectedFeature]);
 
-  const handleFeaturePress = useCallback((feature: SelectedMapFeature) => {
-    const enrichedFeature =
-      mapFeatures.find(
-        (mapFeature) =>
-          mapFeature.id === feature.id &&
-          mapFeature.type === feature.type,
-      ) ?? feature;
+  const handleFeaturePress = useCallback(
+    (feature: SelectedMapFeature) => {
+      const enrichedFeature =
+        mapFeatures.find(
+          (mapFeature) =>
+            mapFeature.id === feature.id &&
+            mapFeature.type === feature.type,
+        ) ?? toAdminLocation(feature);
 
-    setSelectedFeature(enrichedFeature);
+      setSelectedFeature(enrichedFeature);
 
-    void saveGuestHistoryItem({
-      featureId: enrichedFeature.id,
-      featureType: enrichedFeature.type,
-      name: enrichedFeature.name,
-      category: enrichedFeature.category,
-      type: enrichedFeature.type,
-    });
-  }, []);
+      void saveGuestHistoryItem({
+        featureId: enrichedFeature.id,
+        featureType: enrichedFeature.type,
+        name: enrichedFeature.name,
+        category: enrichedFeature.category,
+        type: enrichedFeature.type,
+      });
+    },
+    [mapFeatures],
+  );
 
   const closeFeatureSheet = useCallback(() => {
     setSelectedFeature(undefined);
@@ -98,22 +146,6 @@ export default function MapScreen() {
       router.push({
         pathname: "/building-floors",
         params: { buildingId: selectedFeature.id },
-      });
-      return;
-    }
-
-    if (
-      selectedFeature.type === "room" ||
-      selectedFeature.type === "laboratory" ||
-      selectedFeature.type === "faculty"
-    ) {
-      router.push({
-        pathname: "/room-details",
-        params: {
-          featureId: selectedFeature.id,
-          featureType: selectedFeature.type,
-          buildingId: getBuildingIdForRoom(selectedFeature.id) ?? "",
-        },
       });
       return;
     }
@@ -197,6 +229,10 @@ export default function MapScreen() {
       <OSMMap
         selectedFeatureId={featureId}
         selectedFeatureType={featureType}
+        selectedCategory={selectedCategory}
+        hiddenFeatureKeys={hiddenFeatureKeys}
+        featureOverrides={mapFeatures}
+        openSelectedPopup={shouldOpenInitialSheet}
         currentLocation={currentLocation}
         onFeaturePress={handleFeaturePress}
       />
@@ -229,6 +265,13 @@ export default function MapScreen() {
             </View>
 
             <Text style={styles.featureName}>{selectedFeature.name}</Text>
+            {isMaintenanceAdminLocation(selectedFeature) ? (
+              <View style={styles.maintenancePill}>
+                <Text style={styles.maintenancePillText}>
+                  Under maintenance
+                </Text>
+              </View>
+            ) : null}
 
             <View style={styles.categoryPill}>
               <Text style={styles.categoryPillText}>
@@ -290,11 +333,7 @@ export default function MapScreen() {
               <Text style={styles.detailsButtonText}>
                 {selectedFeature.type === "building"
                   ? "View Floors and Rooms"
-                  : selectedFeature.type === "room" ||
-                      selectedFeature.type === "laboratory" ||
-                      selectedFeature.type === "faculty"
-                    ? "View Room Details"
-                    : "View Details"}
+                  : "View Details"}
               </Text>
               <Text style={styles.detailsButtonArrow}>→</Text>
             </Pressable>
@@ -420,6 +459,23 @@ const styles = StyleSheet.create({
     backgroundColor: "#f3f4f6",
     borderColor: "#e5e7eb",
     borderWidth: 1,
+  },
+
+  maintenancePill: {
+    alignSelf: "flex-start",
+    backgroundColor: "#f3f4f6",
+    borderColor: "#d1d5db",
+    borderRadius: 8,
+    borderWidth: 1,
+    marginBottom: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+
+  maintenancePillText: {
+    color: "#374151",
+    fontSize: 12,
+    fontWeight: "900",
   },
 
   categoryPillText: {

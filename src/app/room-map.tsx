@@ -1,9 +1,14 @@
-import { router, useLocalSearchParams } from "expo-router";
-import { useMemo } from "react";
+import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
+import { useCallback, useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import FloorPlan from "../../components/FloorPlan";
-import { getBuildingRoom, getBuildingRooms } from "../data/campusData";
+import type { BuildingRoom } from "../data/campusData";
+import { loadCampusData } from "../services/campusDataStore";
+import {
+  getEditedBuildingRoom,
+  getEditedBuildingRooms,
+} from "../utils/adminRooms";
 
 export default function RoomMapScreen() {
   const { buildingId, roomId, floorNumber } = useLocalSearchParams<{
@@ -12,13 +17,36 @@ export default function RoomMapScreen() {
     floorNumber?: string;
   }>();
   const selectedFloor = Number(floorNumber ?? 1);
+  const [roomEdits, setRoomEdits] = useState<Record<string, BuildingRoom>>({});
   const room = useMemo(
-    () => (buildingId && roomId ? getBuildingRoom(buildingId, roomId) : undefined),
-    [buildingId, roomId],
+    () =>
+      buildingId && roomId
+        ? getEditedBuildingRoom(buildingId, roomId, roomEdits)
+        : undefined,
+    [buildingId, roomEdits, roomId],
   );
   const rooms = useMemo(
-    () => (buildingId ? getBuildingRooms(buildingId, selectedFloor) : []),
-    [buildingId, selectedFloor],
+    () =>
+      buildingId
+        ? getEditedBuildingRooms(buildingId, roomEdits, selectedFloor)
+        : [],
+    [buildingId, roomEdits, selectedFloor],
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      let isActive = true;
+
+      void loadCampusData().then((snapshot) => {
+        if (isActive) {
+          setRoomEdits(snapshot.roomEdits);
+        }
+      });
+
+      return () => {
+        isActive = false;
+      };
+    }, []),
   );
 
   if (!room || !rooms.length) {
@@ -44,7 +72,7 @@ export default function RoomMapScreen() {
         <Pressable
           accessibilityRole="button"
           style={styles.button}
-          onPress={() => router.replace("/(tabs)/map")}
+          onPress={() => router.replace("/map")}
         >
           <Text style={styles.buttonText}>Back to Map</Text>
         </Pressable>

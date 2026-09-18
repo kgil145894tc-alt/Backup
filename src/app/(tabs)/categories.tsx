@@ -1,9 +1,14 @@
-import { router } from "expo-router";
-import { useMemo, useState } from "react";
+import { router, useFocusEffect } from "expo-router";
+import { useCallback, useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
-import { campusFeatureSummaries } from "../../data/campusData";
+import ProtectedAccess from "../../../components/ProtectedAccess";
+import { loadCampusData } from "../../services/campusDataStore";
 import type { CampusFeatureCategory } from "../../types/campus";
+import {
+  initialAdminLocations,
+  type AdminLocation,
+} from "../../utils/adminLocations";
 
 const categoryOrder: CampusFeatureCategory[] = [
   "Building",
@@ -15,128 +20,97 @@ const categoryOrder: CampusFeatureCategory[] = [
   "Food",
 ];
 
-const mapFeatures = campusFeatureSummaries.map((feature) => ({
-  properties: {
-    id: feature.id,
-    name: feature.name,
-    type: feature.type,
-    category: feature.category,
-  },
-}));
-
-const categories = Array.from(
-  new Set(mapFeatures.map((feature) => feature.properties.category)),
-).sort((a, b) => {
-  const aIndex = categoryOrder.indexOf(a);
-  const bIndex = categoryOrder.indexOf(b);
-
-  if (aIndex === -1 && bIndex === -1) {
-    return a.localeCompare(b);
-  }
-
-  if (aIndex === -1) {
-    return 1;
-  }
-
-  if (bIndex === -1) {
-    return -1;
-  }
-
-  return aIndex - bIndex;
-});
-
 export default function Categories() {
-  const [selectedCategory, setSelectedCategory] = useState(
-    categories[0] ?? "",
+  const [mapFeatures, setMapFeatures] =
+    useState<AdminLocation[]>(initialAdminLocations);
+
+  useFocusEffect(
+    useCallback(() => {
+      let isActive = true;
+
+      void loadCampusData().then((snapshot) => {
+        if (isActive) {
+          setMapFeatures(snapshot.visibleLocations);
+        }
+      });
+
+      return () => {
+        isActive = false;
+      };
+    }, []),
   );
 
-  const selectedFeatures = useMemo(
+  const categories = useMemo(
     () =>
-      mapFeatures.filter(
-        (feature) => feature.properties.category === selectedCategory,
-      ),
-    [selectedCategory],
+      Array.from(
+        new Set(mapFeatures.map((feature) => feature.category)),
+      ).sort((a, b) => {
+        const aIndex = categoryOrder.indexOf(a);
+        const bIndex = categoryOrder.indexOf(b);
+
+        if (aIndex === -1 && bIndex === -1) {
+          return a.localeCompare(b);
+        }
+
+        if (aIndex === -1) {
+          return 1;
+        }
+
+        if (bIndex === -1) {
+          return -1;
+        }
+
+        return aIndex - bIndex;
+      }),
+    [mapFeatures],
   );
+
+  function openCategoryOnMap(category: CampusFeatureCategory) {
+    router.push({
+      pathname: "/(tabs)/map",
+      params: {
+        category,
+      },
+    });
+  }
 
   return (
-    <ScrollView
-      contentContainerStyle={styles.content}
-      style={styles.container}
-      showsVerticalScrollIndicator={false}
-    >
+    <ProtectedAccess>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        style={styles.container}
+        showsVerticalScrollIndicator={false}
+      >
       <Text style={styles.heading}>Categories</Text>
       <Text style={styles.subheading}>
-        Browse campus places by type, then tap a result to open it on the map.
+        Choose a campus type to show its locations on the map.
       </Text>
 
       <View style={styles.categoryGrid}>
         {categories.map((category) => {
           const count = mapFeatures.filter(
-            (feature) => feature.properties.category === category,
+            (feature) => feature.category === category,
           ).length;
-          const isSelected = selectedCategory === category;
 
           return (
             <Pressable
               key={category}
-              style={[
-                styles.categoryCard,
-                isSelected && styles.categoryCardSelected,
-              ]}
-              onPress={() => setSelectedCategory(category)}
+              accessibilityRole="button"
+              accessibilityLabel={`Show ${category} locations on the map`}
+              style={styles.categoryCard}
+              onPress={() => openCategoryOnMap(category)}
             >
-              <Text
-                style={[
-                  styles.categoryName,
-                  isSelected && styles.categoryNameSelected,
-                ]}
-              >
-                {category}
-              </Text>
-              <Text
-                style={[
-                  styles.categoryCount,
-                  isSelected && styles.categoryCountSelected,
-                ]}
-              >
+              <Text style={styles.categoryName}>{category}</Text>
+              <Text style={styles.categoryCount}>
                 {count} {count === 1 ? "place" : "places"}
               </Text>
+              <Text style={styles.categoryAction}>View on map</Text>
             </Pressable>
           );
         })}
       </View>
-
-      <View style={styles.resultsHeader}>
-        <Text style={styles.resultsTitle}>{selectedCategory}</Text>
-        <Text style={styles.resultsCount}>
-          {selectedFeatures.length}{" "}
-          {selectedFeatures.length === 1 ? "match" : "matches"}
-        </Text>
-      </View>
-
-      <View style={styles.resultList}>
-        {selectedFeatures.map((feature) => (
-          <Pressable
-            key={`${feature.properties.type}-${feature.properties.id}`}
-            style={styles.resultItem}
-            onPress={() =>
-              router.push({
-                pathname: "/(tabs)/location-details",
-                params: {
-                  featureId: feature.properties.id,
-                  featureType: feature.properties.type,
-                },
-              })
-            }
-          >
-            <Text style={styles.resultName}>{feature.properties.name}</Text>
-            <Text style={styles.resultMeta}>
-              {feature.properties.category} - {feature.properties.type}
-            </Text>
-          </Pressable>
-        ))}
-      </View>
-    </ScrollView>
+      </ScrollView>
+    </ProtectedAccess>
   );
 }
 
@@ -171,17 +145,14 @@ const styles = StyleSheet.create({
   },
 
   categoryCard: {
-    borderColor: "#ccc",
+    backgroundColor: "#ffffff",
+    borderColor: "#e5e7eb",
     borderRadius: 8,
     borderWidth: 1,
-    minHeight: 76,
+    minHeight: 104,
+    justifyContent: "space-between",
     padding: 14,
     width: "47%",
-  },
-
-  categoryCardSelected: {
-    backgroundColor: "#0078ff",
-    borderColor: "#0078ff",
   },
 
   categoryName: {
@@ -190,54 +161,15 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
 
-  categoryNameSelected: {
-    color: "white",
-  },
-
   categoryCount: {
     color: "#555",
     fontSize: 13,
   },
 
-  categoryCountSelected: {
-    color: "white",
-  },
-
-  resultsHeader: {
-    alignItems: "baseline",
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 8,
-  },
-
-  resultsTitle: {
-    fontSize: 20,
-    fontWeight: "bold",
-  },
-
-  resultsCount: {
-    color: "#555",
-    fontSize: 13,
-  },
-
-  resultList: {
-    borderTopColor: "#ddd",
-    borderTopWidth: 1,
-  },
-
-  resultItem: {
-    borderBottomColor: "#ddd",
-    borderBottomWidth: 1,
-    paddingVertical: 15,
-  },
-
-  resultName: {
-    fontSize: 18,
-    fontWeight: "bold",
-    marginBottom: 5,
-  },
-
-  resultMeta: {
-    color: "#555",
+  categoryAction: {
+    color: "#8F1D32",
+    fontSize: 12,
+    fontWeight: "800",
+    marginTop: 12,
   },
 });

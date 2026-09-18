@@ -8,17 +8,32 @@ const faqs = [
   {
     question: "What is UMVCFIND for?",
     answer:
-      "UMVCFIND helps students, staff, and visitors find campus buildings, rooms, offices, laboratories, facilities, faculty areas, and food locations.",
+      "UMVCFIND helps students, staff, and visitors find UMVC campus buildings, rooms, offices, laboratories, facilities, food areas, and other important locations.",
   },
   {
     question: "Do I need an account?",
     answer:
-      "No. You can use Search, Categories, and Map as a guest. Account features can be added later.",
+      "No. Guests can use the dashboard and campus map. Other features can be made available after signing in or in a later version.",
+  },
+  {
+    question: "Why did a building name or detail change?",
+    answer:
+      "Campus information may be updated to keep names, descriptions, and room details accurate.",
+  },
+  {
+    question: "Can I use the app without internet?",
+    answer:
+      "Some information may still appear if it was already loaded, but map tiles, updated details, and current location features work best with an internet connection.",
   },
   {
     question: "Why is my current location unavailable?",
     answer:
-      "Location depends on device permission, GPS availability, and browser or phone settings.",
+      "Current location depends on phone/browser permission, GPS availability, internet connection, and device settings. The app can still be used without location access.",
+  },
+  {
+    question: "Does UMVCFIND give turn-by-turn directions?",
+    answer:
+      "Not yet. The current version highlights campus places on the map and shows location details. Full step-by-step routing can be added in a later version.",
   },
 ];
 
@@ -41,24 +56,25 @@ export default function ProfileScreen() {
 
         <Text style={styles.helpTitle}>Help & About</Text>
         <Text style={styles.helpIntro}>
-          UMVCFIND is a campus navigation app for quickly finding places
-          around the UMVC campus.
+          UMVCFIND is a campus wayfinding app for locating places around
+          UMVC, including buildings, rooms, offices, laboratories, facilities,
+          food areas, and services.
         </Text>
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>App Purpose</Text>
           <Text style={styles.bodyText}>
-            The app helps users search for campus locations, browse places by
-            category, and open selected places on the map.
+            The app helps users start from the dashboard and open the campus
+            map to view, identify, and highlight selected buildings or rooms.
           </Text>
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>How To Use Search</Text>
+          <Text style={styles.sectionTitle}>How To Use Dashboard</Text>
           <Text style={styles.bodyText}>
-            Open the Search tab, type a building, room, office, laboratory, or
-            facility name, then tap a result to view it on the map. Recent
-            searches appear below the search bar.
+            Open the Dashboard to access the main guest options. From there,
+            guests can continue to the campus map and view available campus
+            information.
           </Text>
         </View>
 
@@ -66,8 +82,27 @@ export default function ProfileScreen() {
           <Text style={styles.sectionTitle}>How To Use Map</Text>
           <Text style={styles.bodyText}>
             Open the Map tab to view campus places. Tap a highlighted place to
-            see its name, category, and type. If location permission is enabled,
-            the map can also show your current position.
+            see its details, then open its full information page or floor and
+            room list when available. If location permission is enabled, the map
+            can also show your current position.
+          </Text>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Guest Access</Text>
+          <Text style={styles.bodyText}>
+            Guest users can use the Dashboard and Map without an account.
+            Additional screens are intended for signed-in access or future
+            system updates.
+          </Text>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Location Information</Text>
+          <Text style={styles.bodyText}>
+            Location details are provided to help users identify campus places
+            more easily. Information may include the place name, category,
+            floor, nearby area, description, and helpful navigation notes.
           </Text>
         </View>
 
@@ -84,8 +119,8 @@ export default function ProfileScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Contact / Help</Text>
           <Text style={styles.bodyText}>
-            For assistance, contact the campus office or UMVCFIND support.
-            Placeholder: support@umvcfind.local
+            For incorrect building names, room details, or map information,
+            contact the assigned campus office representative.
           </Text>
         </View>
 
@@ -94,7 +129,7 @@ export default function ProfileScreen() {
           <Text style={styles.bodyText}>UMVCFIND</Text>
           <Text style={styles.bodyText}>Version {packageJson.version}</Text>
           <Text style={styles.bodyText}>
-            Built for campus wayfinding and location discovery.
+            Built for UMVC campus wayfinding and location discovery.
           </Text>
         </View>
       </ScrollView>

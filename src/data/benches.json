@@ -1,0 +1,128 @@
+{
+  "type": "FeatureCollection",
+  "name": "benches",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "bench-1",
+        "name": "Bench 1",
+        "type": "bench",
+
+        "location": "nearPsychologyLab"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [125.7943087556282, 7.42579981057543]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "bench-2",
+        "name": "Bench 2",
+        "type": "bench",
+        "location": "benchNearAtBasketBallCourt"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [125.79420088721194, 7.425882472142289]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "bench-3",
+        "name": "Bench 3",
+        "type": "bench",
+        "location": "nearBasketballcourt"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [125.79406907558972, 7.425980052676518]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "bench-4",
+        "name": "Bench 4",
+        "type": "bench",
+        "rotation": 90,
+        "location": "nearChemistryLab"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [125.79412591775645, 7.426110284083452]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "bench-5",
+        "name": "Bench 5",
+        "type": "bench",
+        "rotation": 90,
+        "location": "nearOldBuilding"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [125.7939228921523, 7.425583659785501]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "bench-6",
+        "name": "Bench 6",
+        "type": "bench",
+        "rotation": 90,
+        "location": "nearOldBuilding2"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [125.79381767020764, 7.425661548129671]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "bench-7",
+        "name": "Bench 7",
+        "type": "bench",
+        "rotation": 90,
+        "location": "nearVrooms"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [125.79368427775056, 7.425759445787041]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "bench-8",
+        "name": "Bench 8",
+        "type": "bench",
+        "location": "nearCanteen"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [125.79372032108485, 7.42592485146343]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "bench-9",
+        "name": "Bench 9",
+        "type": "bench",
+        "location": "nearCanteen2"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [125.79367356949457, 7.425866675777918]
+      }
+    }
+  ]
+}
