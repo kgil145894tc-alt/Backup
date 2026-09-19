@@ -15,20 +15,26 @@ import {
   NotificationItem,
 } from "../../../components/NotificationViews";
 import {
-  campusNotifications,
   type CampusNotification,
 } from "../../data/notifications";
 import { loadCampusData } from "../../services/campusDataStore";
+import { loadNotifications } from "../../services/notificationStore";
 import {
   getAppAccessMode,
+  getStoredUserSession,
   isGuestMode,
   type AppAccessMode,
+  type StoredUserSession,
 } from "../../utils/appSession";
 import type { AdminLocation } from "../../utils/adminLocations";
 import {
-  getGuestHistory,
+  getCurrentHistory,
   type GuestHistoryItem,
 } from "../../utils/guestHistory";
+import {
+  getReadNotificationIds,
+  markNotificationRead,
+} from "../../utils/notificationReadState";
 
 type CategoryShortcut = {
   title: string;
@@ -76,22 +82,47 @@ export default function Home() {
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [selectedNotification, setSelectedNotification] =
     useState<CampusNotification>();
+  const [notifications, setNotifications] = useState<CampusNotification[]>(
+    [],
+  );
+  const [readNotificationIds, setReadNotificationIds] = useState<Set<string>>(
+    new Set(),
+  );
   const [accessMode, setAccessMode] = useState<AppAccessMode>("guest");
+  const [userSession, setUserSession] =
+    useState<StoredUserSession | null>(null);
   const [isLimitedAccessOpen, setIsLimitedAccessOpen] = useState(false);
   const isGuest = isGuestMode(accessMode);
+  const displayName =
+    userSession?.displayName?.split(" ")[0] ??
+    userSession?.email?.split("@")[0] ??
+    "User";
 
   useFocusEffect(
     useCallback(() => {
       let isActive = true;
 
       void Promise.all([
-        getGuestHistory(),
+        getCurrentHistory(),
         loadCampusData(),
         getAppAccessMode(),
+        getStoredUserSession(),
+        loadNotifications(),
+        getReadNotificationIds(),
       ]).then(
-        ([history, campusData, mode]) => {
+        ([
+          history,
+          campusData,
+          mode,
+          session,
+          nextNotifications,
+          nextReadNotificationIds,
+        ]) => {
         if (isActive) {
           setAccessMode(mode);
+          setUserSession(session);
+          setNotifications(nextNotifications);
+          setReadNotificationIds(nextReadNotificationIds);
           const visibleLocationKeys = new Set(
             campusData.visibleLocations.map(
               (location) => `${location.type}:${location.id}`,
@@ -136,6 +167,11 @@ export default function Home() {
     setIsNotificationsOpen(true);
   };
 
+  const openNotificationDetails = (notification: CampusNotification) => {
+    setSelectedNotification(notification);
+    void markNotificationRead(notification.id).then(setReadNotificationIds);
+  };
+
   const openLockedRoute = (pathname: "/(tabs)/search" | "/(tabs)/categories") => {
     if (isGuest) {
       openLimitedAccess();
@@ -161,6 +197,11 @@ export default function Home() {
         location.id === item.featureId &&
         location.type === item.featureType,
     );
+  const unreadNotificationCount = isGuest
+    ? 0
+    : notifications.filter(
+        (notification) => !readNotificationIds.has(notification.id),
+      ).length;
 
   return (
     <ScrollView
@@ -185,13 +226,22 @@ export default function Home() {
           onPress={openNotifications}
         >
           <Text style={styles.notificationText}>!</Text>
+          {unreadNotificationCount > 0 ? (
+            <View style={styles.notificationBadge}>
+              <Text style={styles.notificationBadgeText}>
+                {unreadNotificationCount > 9 ? "9+" : unreadNotificationCount}
+              </Text>
+            </View>
+          ) : null}
         </Pressable>
       </View>
 
       <View style={styles.main}>
         <View style={styles.welcomeBlock}>
           <Text style={styles.title}>
-            {isGuest ? "Welcome Back, Guest!" : "Welcome Back, User!"}
+            {isGuest
+              ? "Welcome Back, Guest!"
+              : `Welcome Back, ${displayName}!`}
           </Text>
         </View>
 
@@ -358,11 +408,12 @@ export default function Home() {
             </View>
 
             <View style={styles.notificationList}>
-              {campusNotifications.slice(0, 4).map((notification) => (
+              {notifications.slice(0, 4).map((notification) => (
                 <NotificationItem
+                  isRead={readNotificationIds.has(notification.id)}
                   key={notification.id}
                   notification={notification}
-                  onPress={setSelectedNotification}
+                  onPress={openNotificationDetails}
                 />
               ))}
             </View>
@@ -487,6 +538,7 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     height: 36,
     justifyContent: "center",
+    position: "relative",
     width: 36,
   },
 
@@ -494,6 +546,27 @@ const styles = StyleSheet.create({
     color: "#111827",
     fontSize: 17,
     fontWeight: "900",
+  },
+
+  notificationBadge: {
+    alignItems: "center",
+    backgroundColor: "#111827",
+    borderColor: "#f9fafb",
+    borderRadius: 9,
+    borderWidth: 1,
+    minWidth: 18,
+    height: 18,
+    justifyContent: "center",
+    position: "absolute",
+    right: -4,
+    top: -4,
+  },
+
+  notificationBadgeText: {
+    color: "white",
+    fontSize: 10,
+    fontWeight: "900",
+    paddingHorizontal: 3,
   },
 
   notificationOverlay: {

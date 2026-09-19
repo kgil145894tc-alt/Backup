@@ -1,5 +1,6 @@
 import { router } from "expo-router";
-import { useState } from "react";
+import { useFocusEffect } from "expo-router";
+import { useCallback, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import {
@@ -8,13 +9,47 @@ import {
 } from "../../components/NotificationViews";
 import ProtectedAccess from "../../components/ProtectedAccess";
 import {
-  campusNotifications,
   type CampusNotification,
 } from "../data/notifications";
+import { loadNotifications } from "../services/notificationStore";
+import {
+  getReadNotificationIds,
+  markNotificationRead,
+} from "../utils/notificationReadState";
 
 export default function NotificationsScreen() {
+  const [notifications, setNotifications] = useState<CampusNotification[]>(
+    [],
+  );
   const [selectedNotification, setSelectedNotification] =
     useState<CampusNotification>();
+  const [readNotificationIds, setReadNotificationIds] = useState<Set<string>>(
+    new Set(),
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      let isActive = true;
+
+      void Promise.all([loadNotifications(), getReadNotificationIds()]).then(
+        ([nextNotifications, nextReadNotificationIds]) => {
+          if (isActive) {
+            setNotifications(nextNotifications);
+            setReadNotificationIds(nextReadNotificationIds);
+          }
+        },
+      );
+
+      return () => {
+        isActive = false;
+      };
+    }, []),
+  );
+
+  const openNotificationDetails = (notification: CampusNotification) => {
+    setSelectedNotification(notification);
+    void markNotificationRead(notification.id).then(setReadNotificationIds);
+  };
 
   return (
     <ProtectedAccess>
@@ -34,11 +69,12 @@ export default function NotificationsScreen() {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
-        {campusNotifications.map((notification) => (
+        {notifications.map((notification) => (
           <NotificationItem
+            isRead={readNotificationIds.has(notification.id)}
             key={notification.id}
             notification={notification}
-            onPress={setSelectedNotification}
+            onPress={openNotificationDetails}
           />
         ))}
       </ScrollView>

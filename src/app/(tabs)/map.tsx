@@ -18,7 +18,7 @@ import {
   isMaintenanceAdminLocation,
   type AdminLocation,
 } from "../../utils/adminLocations";
-import { saveGuestHistoryItem } from "../../utils/guestHistory";
+import { saveCurrentHistoryItem } from "../../utils/guestHistory";
 
 function getFeatureFromParams(
   mapFeatures: AdminLocation[],
@@ -102,7 +102,7 @@ export default function MapScreen() {
       return;
     }
 
-    void saveGuestHistoryItem({
+    void saveCurrentHistoryItem({
       featureId: initialSelectedFeature.id,
       featureType: initialSelectedFeature.type,
       name: initialSelectedFeature.name,
@@ -122,7 +122,7 @@ export default function MapScreen() {
 
       setSelectedFeature(enrichedFeature);
 
-      void saveGuestHistoryItem({
+      void saveCurrentHistoryItem({
         featureId: enrichedFeature.id,
         featureType: enrichedFeature.type,
         name: enrichedFeature.name,

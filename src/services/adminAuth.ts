@@ -4,13 +4,13 @@ import {
   signOut,
   type User,
 } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
 
 import {
   firebaseAuth,
   firestoreDb,
   isFirebaseConfigured,
 } from "./firebase";
+import { getUserRole } from "./firestoreData";
 
 export const PROTOTYPE_ADMIN_EMAIL = "admin@umvcfind.local";
 export const PROTOTYPE_ADMIN_PASSWORD = "admin123";
@@ -43,13 +43,7 @@ async function hasAdminRole(user: User) {
     return false;
   }
 
-  const userSnapshot = await getDoc(doc(firestoreDb, "users", user.uid));
-
-  if (!userSnapshot.exists()) {
-    return false;
-  }
-
-  return userSnapshot.data().role === "admin";
+  return (await getUserRole(user.uid)) === "admin";
 }
 
 export async function loginAdmin(

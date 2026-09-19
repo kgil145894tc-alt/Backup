@@ -15,6 +15,7 @@ import {
   getBuildingRooms,
   type BuildingRoom,
 } from "../data/campusData";
+import type { CampusNotification } from "../data/notifications";
 import {
   loginAdmin,
   logoutAdmin,
@@ -28,6 +29,7 @@ import {
   adminLocationToFirestore,
   buildingRoomToFirestore,
   canUseFirestore,
+  createNotification,
   updateLocation,
   updateRoom,
 } from "../services/firestoreData";
@@ -46,7 +48,27 @@ import {
 } from "../utils/adminRooms";
 
 const categoryOptions = ["All Categories", ...campusCategories];
+const notificationCategoryOptions: CampusNotification["category"][] = [
+  "announcement",
+  "building",
+  "room",
+  "maintenance",
+];
 const PROTOTYPE_ADMIN_ID = "prototype-admin";
+
+type NotificationDraft = {
+  category: CampusNotification["category"];
+  message: string;
+  relatedLocationKey: string;
+  title: string;
+};
+
+const emptyNotificationDraft: NotificationDraft = {
+  category: "announcement",
+  message: "",
+  relatedLocationKey: "",
+  title: "",
+};
 
 function getAdminStats(locations: AdminLocation[]) {
   return {
@@ -70,6 +92,28 @@ function toEditableText(value: string | number | undefined) {
   return value === undefined ? "" : String(value);
 }
 
+function getLocationNotificationCopy(location: AdminLocation) {
+  if (location.status === "Maintenance") {
+    return {
+      category: "maintenance" as const,
+      message: `${location.name} is currently marked as under maintenance.`,
+      title: "Maintenance Notice",
+    };
+  }
+
+  return {
+    category:
+      location.type === "building"
+        ? "building" as const
+        : "announcement" as const,
+    message: `${location.name} information has been updated.`,
+    title:
+      location.type === "building"
+        ? "Building Information Updated"
+        : "Location Information Updated",
+  };
+}
+
 export default function AdminScreen() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [adminSession, setAdminSession] = useState<AdminSession | null>(
@@ -91,6 +135,10 @@ export default function AdminScreen() {
   );
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [saveMessage, setSaveMessage] = useState("");
+  const [isNotificationComposerOpen, setIsNotificationComposerOpen] =
+    useState(false);
+  const [notificationDraft, setNotificationDraft] =
+    useState<NotificationDraft>(emptyNotificationDraft);
 
   useEffect(() => {
     let isActive = true;
@@ -166,6 +214,19 @@ export default function AdminScreen() {
         adminLocationToFirestore(location),
         PROTOTYPE_ADMIN_ID,
       );
+      const notificationCopy = getLocationNotificationCopy(location);
+
+      await createNotification({
+        id: `location-${location.type}-${location.id}`,
+        title: notificationCopy.title,
+        message: notificationCopy.message,
+        timeLabel: "Recently",
+        category: notificationCopy.category,
+        locationName: location.name,
+        locationSubtitle: location.category,
+        relatedFeatureId: location.id,
+        relatedFeatureType: location.type,
+      });
       setSaveMessage("Saved locally and synced to Firestore.");
     } catch (error) {
       console.warn("Failed to sync location to Firestore", error);
@@ -211,6 +272,17 @@ export default function AdminScreen() {
 
     try {
       await updateRoom(buildingRoomToFirestore(room), PROTOTYPE_ADMIN_ID);
+      await createNotification({
+        id: `room-${room.buildingId}-${room.id}`,
+        title: "Room Update",
+        message: `${room.name} information is now updated.`,
+        timeLabel: "Recently",
+        category: "room",
+        locationName: room.name,
+        locationSubtitle: room.floor,
+        relatedFeatureId: room.id,
+        relatedFeatureType: room.type,
+      });
       setSaveMessage("Room saved locally and synced to Firestore.");
     } catch (error) {
       console.warn("Failed to sync room to Firestore", error);
@@ -233,6 +305,51 @@ export default function AdminScreen() {
     setEditingRoom(null);
     setSaveMessage("Saving room locally and syncing to Firestore...");
     void syncRoomToFirestore(editingRoom);
+  };
+
+  const publishManualNotification = async () => {
+    const title = notificationDraft.title.trim();
+    const message = notificationDraft.message.trim();
+
+    if (!title || !message) {
+      setSaveMessage("Notification title and message are required.");
+      return;
+    }
+
+    if (!canUseFirestore()) {
+      setSaveMessage("Notification was not sent. Firestore is not configured.");
+      return;
+    }
+
+    const relatedLocation = locations.find(
+      (location) =>
+        `${location.type}:${location.id}` ===
+        notificationDraft.relatedLocationKey,
+    );
+
+    setSaveMessage("Publishing notification...");
+
+    try {
+      await createNotification({
+        id: `manual-${notificationDraft.category}-${Date.now()}`,
+        category: notificationDraft.category,
+        createdBy: adminSession?.uid ?? PROTOTYPE_ADMIN_ID,
+        locationName: relatedLocation?.name,
+        locationSubtitle: relatedLocation?.category,
+        message,
+        relatedFeatureId: relatedLocation?.id,
+        relatedFeatureType: relatedLocation?.type,
+        timeLabel: "Recently",
+        title,
+      });
+
+      setNotificationDraft(emptyNotificationDraft);
+      setIsNotificationComposerOpen(false);
+      setSaveMessage("Notification published to users.");
+    } catch (error) {
+      console.warn("Failed to publish manual notification", error);
+      setSaveMessage("Notification publish failed. Check Firestore rules.");
+    }
   };
 
   const handleAdminLogin = async () => {
@@ -383,6 +500,12 @@ export default function AdminScreen() {
               <Text style={styles.resetButtonText}>Reset</Text>
             </Pressable>
             <Pressable
+              style={styles.resetButton}
+              onPress={() => setIsNotificationComposerOpen(true)}
+            >
+              <Text style={styles.resetButtonText}>New Notification</Text>
+            </Pressable>
+            <Pressable
               style={styles.logoutButton}
               onPress={handleAdminLogout}
             >
@@ -515,6 +638,15 @@ export default function AdminScreen() {
         onChange={setEditingRoom}
         onClose={() => setEditingRoom(null)}
         onSave={saveEditedRoom}
+      />
+
+      <NotificationComposerModal
+        draft={notificationDraft}
+        locations={locations}
+        onChange={setNotificationDraft}
+        onClose={() => setIsNotificationComposerOpen(false)}
+        onPublish={publishManualNotification}
+        visible={isNotificationComposerOpen}
       />
     </View>
   );
@@ -900,6 +1032,147 @@ function EditRoomModal({
             </View>
           </View>
         ) : null}
+      </View>
+    </Modal>
+  );
+}
+
+function NotificationComposerModal({
+  draft,
+  locations,
+  onChange,
+  onClose,
+  onPublish,
+  visible,
+}: {
+  draft: NotificationDraft;
+  locations: AdminLocation[];
+  onChange: (draft: NotificationDraft) => void;
+  onClose: () => void;
+  onPublish: () => void;
+  visible: boolean;
+}) {
+  return (
+    <Modal transparent visible={visible} animationType="fade">
+      <View style={styles.modalOverlay}>
+        <View style={styles.notificationComposerModal}>
+          <View style={styles.modalHeader}>
+            <View>
+              <Text style={styles.modalTitle}>New Notification</Text>
+              <Text style={styles.modalSubtitle}>
+                Publish an update users can view from Home.
+              </Text>
+            </View>
+            <Pressable onPress={onClose}>
+              <Text style={styles.modalClose}>x</Text>
+            </Pressable>
+          </View>
+
+          <AdminTextField
+            label="Title"
+            value={draft.title}
+            onChangeText={(title) => onChange({ ...draft, title })}
+          />
+
+          <Text style={styles.inputLabel}>Category</Text>
+          <View style={styles.notificationCategoryList}>
+            {notificationCategoryOptions.map((category) => (
+              <Pressable
+                key={category}
+                style={[
+                  styles.statusButton,
+                  draft.category === category && styles.statusButtonActive,
+                ]}
+                onPress={() => onChange({ ...draft, category })}
+              >
+                <Text
+                  style={[
+                    styles.statusButtonText,
+                    draft.category === category &&
+                      styles.statusButtonTextActive,
+                  ]}
+                >
+                  {category}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+
+          <Text style={styles.inputLabel}>Related Location</Text>
+          <ScrollView
+            contentContainerStyle={styles.relatedLocationList}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+          >
+            <Pressable
+              style={[
+                styles.filterChip,
+                !draft.relatedLocationKey && styles.filterChipActive,
+              ]}
+              onPress={() =>
+                onChange({ ...draft, relatedLocationKey: "" })
+              }
+            >
+              <Text
+                style={[
+                  styles.filterChipText,
+                  !draft.relatedLocationKey &&
+                    styles.filterChipTextActive,
+                ]}
+              >
+                None
+              </Text>
+            </Pressable>
+            {locations.slice(0, 20).map((location) => {
+              const locationKey = `${location.type}:${location.id}`;
+
+              return (
+                <Pressable
+                  key={locationKey}
+                  style={[
+                    styles.filterChip,
+                    draft.relatedLocationKey === locationKey &&
+                      styles.filterChipActive,
+                  ]}
+                  onPress={() =>
+                    onChange({
+                      ...draft,
+                      relatedLocationKey: locationKey,
+                    })
+                  }
+                >
+                  <Text
+                    style={[
+                      styles.filterChipText,
+                      draft.relatedLocationKey === locationKey &&
+                        styles.filterChipTextActive,
+                    ]}
+                  >
+                    {location.name}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+
+          <Text style={styles.inputLabel}>Message</Text>
+          <TextInput
+            multiline
+            onChangeText={(message) => onChange({ ...draft, message })}
+            placeholder="Write the notification details"
+            style={[styles.input, styles.notificationMessageInput]}
+            value={draft.message}
+          />
+
+          <View style={styles.modalFooter}>
+            <Pressable style={styles.cancelButton} onPress={onClose}>
+              <Text style={styles.cancelButtonText}>Cancel</Text>
+            </Pressable>
+            <Pressable style={styles.saveButton} onPress={onPublish}>
+              <Text style={styles.saveButtonText}>Publish</Text>
+            </Pressable>
+          </View>
+        </View>
       </View>
     </Modal>
   );
@@ -1416,6 +1689,14 @@ const styles = StyleSheet.create({
     width: "100%",
   },
 
+  notificationComposerModal: {
+    backgroundColor: "white",
+    borderRadius: 8,
+    maxWidth: 620,
+    padding: 18,
+    width: "100%",
+  },
+
   modalHeader: {
     alignItems: "center",
     flexDirection: "row",
@@ -1553,6 +1834,23 @@ const styles = StyleSheet.create({
 
   statusButtonTextActive: {
     color: "white",
+  },
+
+  notificationCategoryList: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginBottom: 14,
+  },
+
+  relatedLocationList: {
+    gap: 8,
+    paddingBottom: 12,
+  },
+
+  notificationMessageInput: {
+    minHeight: 120,
+    textAlignVertical: "top",
   },
 
   textArea: {

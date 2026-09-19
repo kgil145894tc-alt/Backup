@@ -12,7 +12,7 @@ import {
   isMaintenanceAdminLocation,
   type AdminLocation,
 } from "../../utils/adminLocations";
-import { saveGuestHistoryItem } from "../../utils/guestHistory";
+import { saveCurrentHistoryItem } from "../../utils/guestHistory";
 
 function getFeatureFromParams(
   features: AdminLocation[],
@@ -62,7 +62,7 @@ export default function LocationDetailsScreen() {
       return;
     }
 
-    void saveGuestHistoryItem({
+    void saveCurrentHistoryItem({
       featureId: feature.id,
       featureType: feature.type,
       name: feature.name,

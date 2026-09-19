@@ -3,6 +3,7 @@ import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import type { CampusNotification } from "../src/data/notifications";
 
 type NotificationItemProps = {
+  isRead?: boolean;
   notification: CampusNotification;
   onPress: (notification: CampusNotification) => void;
 };
@@ -20,6 +21,7 @@ const categoryIcon: Record<CampusNotification["category"], string> = {
 };
 
 export function NotificationItem({
+  isRead = true,
   notification,
   onPress,
 }: NotificationItemProps) {
@@ -27,7 +29,10 @@ export function NotificationItem({
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={`Open notification: ${notification.title}`}
-      style={styles.notificationItem}
+      style={[
+        styles.notificationItem,
+        !isRead ? styles.notificationItemUnread : null,
+      ]}
       onPress={() => onPress(notification)}
     >
       <View style={styles.iconCircle}>
@@ -35,9 +40,12 @@ export function NotificationItem({
       </View>
 
       <View style={styles.notificationCopy}>
-        <Text numberOfLines={1} style={styles.notificationTitle}>
-          {notification.title}
-        </Text>
+        <View style={styles.notificationTitleRow}>
+          <Text numberOfLines={1} style={styles.notificationTitle}>
+            {notification.title}
+          </Text>
+          {!isRead ? <View style={styles.unreadDot} /> : null}
+        </View>
         <Text numberOfLines={2} style={styles.notificationMessage}>
           {notification.message}
         </Text>
@@ -131,6 +139,11 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
 
+  notificationItemUnread: {
+    borderColor: "#9ca3af",
+    borderWidth: 2,
+  },
+
   iconCircle: {
     alignItems: "center",
     backgroundColor: "#f3f4f6",
@@ -151,11 +164,26 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
+  notificationTitleRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 8,
+  },
+
   notificationTitle: {
     color: "#111827",
+    flex: 1,
     fontSize: 14,
     fontWeight: "900",
     marginBottom: 3,
+  },
+
+  unreadDot: {
+    backgroundColor: "#111827",
+    borderRadius: 4,
+    height: 8,
+    marginBottom: 3,
+    width: 8,
   },
 
   notificationMessage: {

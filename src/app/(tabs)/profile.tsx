@@ -1,8 +1,18 @@
-import { router } from "expo-router";
-import { useState } from "react";
+import { router, useFocusEffect } from "expo-router";
+import { useCallback, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import packageJson from "../../../package.json";
+import { signOutUser } from "../../services/userAuth";
+import {
+  clearStoredUserSession,
+  getAppAccessMode,
+  getStoredUserSession,
+  isGuestMode,
+  setAppAccessMode,
+  type AppAccessMode,
+  type StoredUserSession,
+} from "../../utils/appSession";
 
 const faqs = [
   {
@@ -39,6 +49,46 @@ const faqs = [
 
 export default function ProfileScreen() {
   const [isHelpOpen, setIsHelpOpen] = useState(false);
+  const [accessMode, setAccessModeState] = useState<AppAccessMode>("guest");
+  const [userSession, setUserSession] =
+    useState<StoredUserSession | null>(null);
+  const isGuest = isGuestMode(accessMode);
+  const displayName =
+    userSession?.displayName ??
+    userSession?.email?.split("@")[0] ??
+    "Signed-in User";
+  const profileInitial = isGuest
+    ? "G"
+    : displayName.trim().charAt(0).toUpperCase() || "U";
+
+  useFocusEffect(
+    useCallback(() => {
+      let isActive = true;
+
+      void Promise.all([
+        getAppAccessMode(),
+        getStoredUserSession(),
+      ]).then(([mode, session]) => {
+        if (isActive) {
+          setAccessModeState(mode);
+          setUserSession(session);
+        }
+      });
+
+      return () => {
+        isActive = false;
+      };
+    }, []),
+  );
+
+  const handleLogout = async () => {
+    await signOutUser();
+    await clearStoredUserSession();
+    await setAppAccessMode("guest");
+    setAccessModeState("guest");
+    setUserSession(null);
+    router.replace("/login");
+  };
 
   if (isHelpOpen) {
     return (
@@ -149,49 +199,63 @@ export default function ProfileScreen() {
 
       <View style={styles.profileCard}>
         <View style={styles.avatar}>
-          <Text style={styles.avatarText}>G</Text>
+          <Text style={styles.avatarText}>{profileInitial}</Text>
         </View>
-        <Text style={styles.name}>Guest User</Text>
-        <Text style={styles.email}>Sign in later to sync your account.</Text>
+        <Text style={styles.name}>
+          {isGuest ? "Guest User" : displayName}
+        </Text>
+        <Text style={styles.email}>
+          {isGuest
+            ? "Sign in to unlock the full app experience."
+            : userSession?.email ?? "Signed in with Google"}
+        </Text>
         <View style={styles.statusBadge}>
-          <Text style={styles.statusBadgeText}>Guest Mode</Text>
+          <Text style={styles.statusBadgeText}>
+            {isGuest ? "Guest Mode" : "Signed In"}
+          </Text>
         </View>
       </View>
 
       <View style={styles.optionList}>
         <Pressable
           style={styles.optionItem}
-          onPress={() => router.replace("/")}
+          onPress={isGuest ? () => router.replace("/login") : handleLogout}
         >
           <View style={styles.optionIcon}>
             <Text style={styles.optionIconText}>→</Text>
           </View>
           <View style={styles.optionText}>
-            <Text style={styles.optionTitle}>Login</Text>
+            <Text style={styles.optionTitle}>
+              {isGuest ? "Login" : "Log Out"}
+            </Text>
             <Text style={styles.optionDescription}>
-              Return to the start screen to sign in or continue as guest
+              {isGuest
+                ? "Sign in with Google to unlock more features"
+                : "Sign out of your Google account on this app"}
             </Text>
           </View>
           <Text style={styles.optionArrow}>›</Text>
         </Pressable>
 
-        <Pressable
-          disabled
-          style={[styles.optionItem, styles.optionItemDisabled]}
-        >
-          <View style={[styles.optionIcon, styles.optionIconDisabled]}>
-            <Text style={styles.optionIconTextDisabled}>+</Text>
-          </View>
-          <View style={styles.optionText}>
-            <Text style={[styles.optionTitle, styles.optionTitleDisabled]}>
-              Create Account
-            </Text>
-            <Text style={styles.optionDescription}>
-              Account registration will be connected after auth is ready
-            </Text>
-          </View>
-          <Text style={styles.comingSoon}>Soon</Text>
-        </Pressable>
+        {isGuest ? (
+          <Pressable
+            disabled
+            style={[styles.optionItem, styles.optionItemDisabled]}
+          >
+            <View style={[styles.optionIcon, styles.optionIconDisabled]}>
+              <Text style={styles.optionIconTextDisabled}>+</Text>
+            </View>
+            <View style={styles.optionText}>
+              <Text style={[styles.optionTitle, styles.optionTitleDisabled]}>
+                Create Account
+              </Text>
+              <Text style={styles.optionDescription}>
+                Use Google login to continue as a signed-in user
+              </Text>
+            </View>
+            <Text style={styles.comingSoon}>Soon</Text>
+          </Pressable>
+        ) : null}
 
         <Pressable
           style={styles.optionItem}

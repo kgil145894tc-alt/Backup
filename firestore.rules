@@ -29,7 +29,32 @@ service cloud.firestore {
 
     match /users/{userId} {
       allow read: if isAdmin() || (isSignedIn() && request.auth.uid == userId);
+      allow create: if isSignedIn()
+        && request.auth.uid == userId
+        && request.resource.data.role == "user"
+        && request.resource.data.email == request.auth.token.email;
+      allow update: if isSignedIn()
+        && request.auth.uid == userId
+        && resource.data.role == "user"
+        && request.resource.data.role == "user"
+        && request.resource.data.email == request.auth.token.email;
       allow create, update, delete: if isAdmin();
+
+      match /notificationReads/{notificationId} {
+        allow read, delete: if isSignedIn() && request.auth.uid == userId;
+        allow create, update: if isSignedIn()
+          && request.auth.uid == userId
+          && request.resource.data.notificationId == notificationId
+          && request.resource.data.userId == userId;
+      }
+
+      match /recentLocations/{recentLocationId} {
+        allow read, delete: if isSignedIn() && request.auth.uid == userId;
+        allow create, update: if isSignedIn()
+          && request.auth.uid == userId
+          && request.resource.data.userId == userId
+          && request.resource.data.featureType + ":" + request.resource.data.featureId == recentLocationId;
+      }
     }
 
     match /history/{historyId} {

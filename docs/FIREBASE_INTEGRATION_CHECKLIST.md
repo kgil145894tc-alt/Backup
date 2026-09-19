@@ -9,8 +9,13 @@
 - The admin screen loads from Firestore first when Firebase is configured, then caches the data locally for the current app screens.
 - `src/services/campusDataStore.ts` is the shared campus data loader for Admin, Home, Map, Search, Categories, Location Details, Building Floors, Room Details, and Room Map.
 - Admin login uses Firebase Authentication when Firebase is configured, and checks `users/{uid}.role === "admin"` before allowing access.
+- User Google login syncs the signed-in user's profile to `users/{uid}` with `role: "user"` for new accounts.
 - The prototype admin login still works only when Firebase is not configured.
 - Firestore rules are available in `firestore.rules` and referenced by `firebase.json`.
+- Guest history stays local. Signed-in user history syncs to `users/{uid}/recentLocations`, with local storage as fallback.
+- Admin location and room saves create Firestore notification records; notification screens load Firestore notifications with sample-data fallback.
+- Admins can publish manual notification announcements from the web admin panel.
+- Notification read/unread state is synced to `users/{uid}/notificationReads` for signed-in users, with local storage as fallback.
 - Firestore is not required yet, so the app will not break if Firebase environment values are empty.
 
 ## Required Environment Values
@@ -67,6 +72,9 @@ Current rule intent:
 - Anyone can read public campus data: `locations`, `rooms`, `categories`, and `notifications`.
 - Only authenticated admins can create, update, or delete public campus data.
 - Admin status is checked using `users/{uid}.role === "admin"`.
+- Signed-in users can create/update only their own normal `users/{uid}` profile; admin role changes remain admin-only.
+- Signed-in users can only access their own `users/{uid}/notificationReads` documents.
+- Signed-in users can only access their own `users/{uid}/recentLocations` documents.
 - Signed-in users can only access their own `history` documents.
 - Any collection not listed is denied by default.
 

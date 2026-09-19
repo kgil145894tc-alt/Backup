@@ -5,9 +5,14 @@ import { Pressable, StyleSheet } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import LimitedAccessModal from "../../../components/LimitedAccessModal";
+import { watchUserSession } from "../../services/userAuth";
 import {
+  clearStoredUserSession,
   getAppAccessMode,
+  getStoredUserSession,
   isGuestMode,
+  setAppAccessMode,
+  setStoredUserSession,
   type AppAccessMode,
 } from "../../utils/appSession";
 
@@ -19,15 +24,47 @@ export default function TabLayout() {
   useFocusEffect(
     useCallback(() => {
       let isActive = true;
+      let localMode: AppAccessMode = "guest";
+      let hasStoredSession = false;
+      let unsubscribe = () => {};
 
-      void getAppAccessMode().then((mode) => {
-        if (isActive) {
-          setAccessMode(mode);
+      void Promise.all([
+        getAppAccessMode(),
+        getStoredUserSession(),
+      ]).then(([mode, storedSession]) => {
+        if (!isActive) {
+          return;
         }
+
+        localMode = mode;
+        hasStoredSession = Boolean(storedSession);
+        setAccessMode(mode);
+
+        unsubscribe = watchUserSession((session) => {
+          if (!isActive) {
+            return;
+          }
+
+          if (session) {
+            setAccessMode("user");
+            void setStoredUserSession(session);
+            void setAppAccessMode("user");
+            return;
+          }
+
+          if (localMode === "user" && hasStoredSession) {
+            return;
+          }
+
+          setAccessMode("guest");
+          void clearStoredUserSession();
+          void setAppAccessMode("guest");
+        });
       });
 
       return () => {
         isActive = false;
+        unsubscribe();
       };
     }, []),
   );

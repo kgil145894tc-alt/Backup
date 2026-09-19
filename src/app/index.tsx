@@ -1,9 +1,53 @@
 import { Image } from "expo-image";
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
+import { useCallback, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import {
+  getAppAccessMode,
+  getStoredUserSession,
+} from "../utils/appSession";
+
 export default function WelcomeScreen() {
+  const [isCheckingSession, setIsCheckingSession] = useState(true);
+
+  useFocusEffect(
+    useCallback(() => {
+      let isActive = true;
+
+      void Promise.all([
+        getAppAccessMode(),
+        getStoredUserSession(),
+      ]).then(([mode, session]) => {
+        if (!isActive) {
+          return;
+        }
+
+        if (mode === "user" && session?.uid) {
+          router.replace("/(tabs)");
+          return;
+        }
+
+        setIsCheckingSession(false);
+      });
+
+      return () => {
+        isActive = false;
+      };
+    }, []),
+  );
+
+  if (isCheckingSession) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingContent}>
+          <Text style={styles.loadingText}>Loading UMVC FIND...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.mapBackground}>
@@ -149,6 +193,19 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 28,
+  },
+
+  loadingContent: {
+    alignItems: "center",
+    flex: 1,
+    justifyContent: "center",
+    paddingHorizontal: 28,
+  },
+
+  loadingText: {
+    color: "#1f2933",
+    fontSize: 15,
+    fontWeight: "800",
   },
 
   logoPin: {

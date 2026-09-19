@@ -14,8 +14,8 @@ import {
   loadCampusData,
 } from "../../services/campusDataStore";
 import {
-  getGuestHistory,
-  saveGuestHistoryItem,
+  getCurrentHistory,
+  saveCurrentHistoryItem,
 } from "../../utils/guestHistory";
 import type {
   GuestHistoryItem,
@@ -60,7 +60,7 @@ export default function SearchScreen() {
 
       async function loadRecentSearches() {
         const [nextRecentSearches, campusData] =
-          await Promise.all([getGuestHistory(), loadCampusData()]);
+          await Promise.all([getCurrentHistory(), loadCampusData()]);
 
         if (isActive) {
           setMapFeatures(
@@ -87,7 +87,7 @@ export default function SearchScreen() {
 
   const openFeature = useCallback(
     (feature: SaveGuestHistoryItem) => {
-      void saveGuestHistoryItem(feature).then(setRecentSearches);
+      void saveCurrentHistoryItem(feature).then(setRecentSearches);
 
       router.push({
         pathname: "/(tabs)/map",

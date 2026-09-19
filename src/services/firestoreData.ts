@@ -1,11 +1,16 @@
 import {
   collection,
   doc,
+  getDoc,
   getDocs,
+  limit,
+  orderBy,
+  query,
   serverTimestamp,
   setDoc,
 } from "firebase/firestore";
 
+import type { CampusNotification } from "../data/notifications";
 import type { CampusFeatureCategory, CampusFeatureType } from "../types/campus";
 import type { AdminLocation, AdminLocationStatus } from "../utils/adminLocations";
 import type { BuildingRoom } from "../data/campusData";
@@ -13,6 +18,10 @@ import { firestoreDb, isFirebaseConfigured } from "./firebase";
 
 const LOCATIONS_COLLECTION = "locations";
 const ROOMS_COLLECTION = "rooms";
+const NOTIFICATIONS_COLLECTION = "notifications";
+const USERS_COLLECTION = "users";
+const NOTIFICATION_READS_COLLECTION = "notificationReads";
+const RECENT_LOCATIONS_COLLECTION = "recentLocations";
 
 export type FirestoreLocation = {
   locationId: string;
@@ -44,6 +53,33 @@ export type FirestoreRoom = {
   photoUrl?: string;
   status: AdminLocationStatus;
   updatedBy?: string;
+};
+
+export type FirestoreNotification = CampusNotification & {
+  createdAt?: unknown;
+  createdAtMs: number;
+  createdBy?: string;
+  relatedFeatureId?: string;
+  relatedFeatureType?: CampusFeatureType;
+};
+
+export type FirestoreRecentLocation = {
+  category: string;
+  featureId: string;
+  featureType: string;
+  name: string;
+  type: string;
+  userId: string;
+  viewedAt: number;
+  viewedAtTimestamp?: unknown;
+};
+
+export type FirestoreUserProfile = {
+  displayName?: string | null;
+  email?: string | null;
+  isActive: boolean;
+  photoUrl?: string | null;
+  role: "admin" | "user";
 };
 
 function requireFirestore() {
@@ -188,4 +224,166 @@ export async function updateRoom(room: FirestoreRoom, updatedBy?: string) {
     }),
     { merge: true },
   );
+}
+
+export async function getNotifications(maxItems = 25) {
+  const db = requireFirestore();
+  const snapshot = await getDocs(
+    query(
+      collection(db, NOTIFICATIONS_COLLECTION),
+      orderBy("createdAtMs", "desc"),
+      limit(maxItems),
+    ),
+  );
+
+  return snapshot.docs.map((notificationDoc) => ({
+    ...notificationDoc.data(),
+    id: notificationDoc.id,
+  })) as FirestoreNotification[];
+}
+
+export async function createNotification(
+  notification: Omit<FirestoreNotification, "createdAt" | "createdAtMs">,
+) {
+  const db = requireFirestore();
+  const createdAtMs = Date.now();
+  const notificationRef = doc(
+    db,
+    NOTIFICATIONS_COLLECTION,
+    `${createdAtMs}-${notification.id}`,
+  );
+
+  await setDoc(
+    notificationRef,
+    withoutUndefined({
+      ...notification,
+      createdAt: serverTimestamp(),
+      createdAtMs,
+    }),
+  );
+}
+
+export async function getUserReadNotificationIds(userId: string) {
+  const db = requireFirestore();
+  const snapshot = await getDocs(
+    collection(
+      db,
+      USERS_COLLECTION,
+      userId,
+      NOTIFICATION_READS_COLLECTION,
+    ),
+  );
+
+  return new Set(snapshot.docs.map((readDoc) => readDoc.id));
+}
+
+export async function markUserNotificationRead(
+  userId: string,
+  notificationId: string,
+) {
+  const db = requireFirestore();
+  const readRef = doc(
+    db,
+    USERS_COLLECTION,
+    userId,
+    NOTIFICATION_READS_COLLECTION,
+    notificationId,
+  );
+
+  await setDoc(
+    readRef,
+    {
+      notificationId,
+      readAt: serverTimestamp(),
+      readAtMs: Date.now(),
+      userId,
+    },
+    { merge: true },
+  );
+}
+
+export async function getUserRecentLocations(userId: string, maxItems = 25) {
+  const db = requireFirestore();
+  const snapshot = await getDocs(
+    query(
+      collection(
+        db,
+        USERS_COLLECTION,
+        userId,
+        RECENT_LOCATIONS_COLLECTION,
+      ),
+      orderBy("viewedAt", "desc"),
+      limit(maxItems),
+    ),
+  );
+
+  return snapshot.docs.map((historyDoc) => ({
+    ...historyDoc.data(),
+  })) as FirestoreRecentLocation[];
+}
+
+export async function saveUserRecentLocation(
+  userId: string,
+  historyItem: Omit<
+    FirestoreRecentLocation,
+    "userId" | "viewedAtTimestamp"
+  >,
+) {
+  const db = requireFirestore();
+  const historyRef = doc(
+    db,
+    USERS_COLLECTION,
+    userId,
+    RECENT_LOCATIONS_COLLECTION,
+    `${historyItem.featureType}:${historyItem.featureId}`,
+  );
+
+  await setDoc(
+    historyRef,
+    withoutUndefined({
+      ...historyItem,
+      userId,
+      viewedAtTimestamp: serverTimestamp(),
+    }),
+    { merge: true },
+  );
+}
+
+export async function syncUserProfile(
+  userProfile: {
+    displayName?: string | null;
+    email?: string | null;
+    photoUrl?: string | null;
+    uid: string;
+  },
+) {
+  const db = requireFirestore();
+  const userRef = doc(db, USERS_COLLECTION, userProfile.uid);
+  const existingUser = await getDoc(userRef);
+
+  await setDoc(
+    userRef,
+    withoutUndefined({
+      displayName: userProfile.displayName ?? null,
+      email: userProfile.email ?? null,
+      isActive: true,
+      photoUrl: userProfile.photoUrl ?? null,
+      role: existingUser.exists() ? undefined : "user",
+      updatedAt: serverTimestamp(),
+    }),
+    { merge: true },
+  );
+}
+
+export async function getUserRole(userId: string) {
+  const db = requireFirestore();
+  const userSnapshot = await getDoc(doc(db, USERS_COLLECTION, userId));
+
+  if (!userSnapshot.exists()) {
+    return null;
+  }
+
+  const role = userSnapshot.data().role;
+
+  return role === "admin" || role === "user" ? role : null;
 }

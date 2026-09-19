@@ -6,6 +6,7 @@
 users/{uid}
   recentLocations/{locationId}
   favorites/{locationId}
+  notificationReads/{notificationId}
 
 categories/{categoryId}
 buildings/{buildingId}
@@ -25,13 +26,15 @@ Document ID: Firebase Authentication user UID (`uid`)
 |---|---|---|
 | `email` | String | Authorized University of Mindanao Google email address. |
 | `displayName` | String | User's Google display name. |
-| `photoUrl` | String \| null | User's Google profile image URL. |
+| `photoUrl` | String \| null | User's Google profile image URL. Synced from Google login when available. |
 | `role` | String | `user` or `admin`. |
 | `isActive` | Boolean | Indicates whether the account may use the system. |
 | `createdAt` | Timestamp | Date and time the user document was created. |
 | `updatedAt` | Timestamp | Date and time the user document was last updated. |
 
 Example path: `users/firebaseAuthUid`
+
+New Google users are created with `role: "user"`. Administrator role changes should be done only through an authorized admin account or the Firebase Console.
 
 ## `categories` Collection
 
@@ -119,14 +122,20 @@ Document ID: generated Firestore ID
 
 ## `users/{uid}/recentLocations` Subcollection
 
-Document ID: `locationId` from the related `locations` document
+Document ID: `${featureType}:${featureId}`
 
 | Field | Data type | Description |
 |---|---|---|
-| `locationId` | String | ID of the viewed `locations` document. |
-| `viewedAt` | Timestamp | Most recent date and time the user viewed the location. |
+| `featureId` | String | ID of the viewed campus feature. |
+| `featureType` | String | Feature type, such as `building`, `office`, `room`, or `facility`. |
+| `name` | String | Display name captured when the feature was opened. |
+| `category` | String | Category captured when the feature was opened. |
+| `type` | String | Type label captured for display in search/history lists. |
+| `userId` | String | Firebase Authentication UID of the signed-in user. |
+| `viewedAt` | Number | Millisecond timestamp used for sorting recent places. |
+| `viewedAtTimestamp` | Timestamp | Server timestamp for the latest view event. |
 
-Using `locationId` as the document ID prevents duplicate history records for the same location and keeps the latest viewing time.
+Using `${featureType}:${featureId}` as the document ID prevents duplicate history records for the same place and keeps the latest viewing time.
 
 ## `users/{uid}/favorites` Subcollection
 
@@ -136,6 +145,19 @@ Document ID: `locationId` from the related `locations` document
 |---|---|---|
 | `locationId` | String | ID of the favorited `locations` document. |
 | `createdAt` | Timestamp | Date and time the location was added to favorites. |
+
+## `users/{uid}/notificationReads` Subcollection
+
+Document ID: `notificationId` from the related `notifications` document
+
+| Field | Data type | Description |
+|---|---|---|
+| `notificationId` | String | ID of the notification that the user opened. |
+| `userId` | String | Firebase Authentication UID of the signed-in user. |
+| `readAt` | Timestamp | Date and time the notification was marked read. |
+| `readAtMs` | Number | Millisecond timestamp used by the app as a simple fallback value. |
+
+This keeps notification content public while each signed-in user's read/unread state stays private to that account.
 
 ## `appConfig` Collection
 
@@ -156,8 +178,9 @@ Document ID: `campus`
 | `categories` | `locations` | One category has many locations. | `locations.categoryId` |
 | `buildings` | `locations` | One building has many rooms or offices. | `locations.buildingId` |
 | `locations` | `routes` | One location can be the start or end of many routes. | `routes.originLocationId`, `routes.destinationLocationId` |
-| `users` | `recentLocations` | One signed-in user has many recently viewed locations. | `users/{uid}/recentLocations` |
+| `users` | `recentLocations` | One signed-in user has many recently viewed features. | `users/{uid}/recentLocations` |
 | `users` | `favorites` | One signed-in user has many favorite locations. | `users/{uid}/favorites` |
+| `users` | `notificationReads` | One signed-in user has many read notification markers. | `users/{uid}/notificationReads` |
 | `users` | `notifications` | One administrator can create many notifications. | `notifications.createdBy` |
 
 ## Simple Database Diagram
@@ -178,9 +201,11 @@ buildings -------->   locations   <-------- routes --------> locations
 users/{uid} ---------------------------------> notifications
      |                                              createdBy
      |
-     +-- recentLocations/{locationId} --------> locations/{locationId}
+     +-- recentLocations/{featureType:featureId} --> locations/rooms/map features
      |
      +-- favorites/{locationId} --------------> locations/{locationId}
+     |
+     +-- notificationReads/{notificationId} --> notifications/{notificationId}
 
 appConfig/campus
   - allowedEmailDomains

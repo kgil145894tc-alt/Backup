@@ -25,6 +25,7 @@ export default function LimitedAccessModal({
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Close limited access message"
+            hitSlop={12}
             style={styles.closeButton}
             onPress={onClose}
           >
@@ -71,11 +72,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "white",
     borderRadius: 8,
+    elevation: 8,
     maxWidth: 340,
     paddingHorizontal: 22,
     paddingBottom: 22,
     paddingTop: 30,
     width: "100%",
+    zIndex: 2,
   },
 
   closeButton: {
@@ -86,6 +89,7 @@ const styles = StyleSheet.create({
     right: 8,
     top: 8,
     width: 34,
+    zIndex: 3,
   },
 
   closeText: {
@@ -140,4 +144,3 @@ const styles = StyleSheet.create({
     fontWeight: "900",
   },
 });
-
