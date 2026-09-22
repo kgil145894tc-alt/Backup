@@ -1,6 +1,6 @@
 import { StyleSheet, Text, View } from "react-native";
 
-import type { BuildingRoom } from "../src/data/campusData";
+import type { BuildingRoom } from "@/data/campusData";
 
 type FloorPlanProps = {
   rooms: BuildingRoom[];

@@ -2,9 +2,13 @@ import { Tabs } from "expo-router";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import { Pressable, StyleSheet } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 
-import LimitedAccessModal from "../../../components/LimitedAccessModal";
+import LimitedAccessModal from "@/components/LimitedAccessModal";
+import CategoriesIcon from "../../../assets/design/icons/nav-categories.svg";
+import HomeIcon from "../../../assets/design/icons/nav-home.svg";
+import MapIcon from "../../../assets/design/icons/nav-map.svg";
+import ProfileIcon from "../../../assets/design/icons/nav-profile.svg";
+import SearchIcon from "../../../assets/design/icons/nav-search.svg";
 import { watchUserSession } from "../../services/userAuth";
 import {
   clearStoredUserSession,
@@ -78,11 +82,19 @@ export default function TabLayout() {
   );
 
   return (
-    <SafeAreaView edges={["top"]} style={styles.container}>
-      <Tabs screenOptions={{ headerShown: false }}>
+    <>
+      <Tabs
+        screenOptions={{
+          headerShown: false,
+          tabBarStyle: styles.tabBar,
+        }}
+      >
         <Tabs.Screen
           name="index"
           options={{
+            tabBarIcon: ({ color, size }) => (
+              <HomeIcon width={size} height={size} color={color} />
+            ),
             title: "Home",
           }}
         />
@@ -90,6 +102,9 @@ export default function TabLayout() {
         <Tabs.Screen
           name="map"
           options={{
+            tabBarIcon: ({ color, size }) => (
+              <MapIcon width={size} height={size} color={color} />
+            ),
             title: "Map",
           }}
         />
@@ -98,6 +113,9 @@ export default function TabLayout() {
           name="search"
           options={{
             tabBarButton: isGuest ? lockedTabButton : undefined,
+            tabBarIcon: ({ color, size }) => (
+              <SearchIcon width={size} height={size} color={color} />
+            ),
             title: "Search",
           }}
         />
@@ -106,6 +124,9 @@ export default function TabLayout() {
           name="categories"
           options={{
             tabBarButton: isGuest ? lockedTabButton : undefined,
+            tabBarIcon: ({ color, size }) => (
+              <CategoriesIcon width={size} height={size} color={color} />
+            ),
             title: "Categories",
           }}
         />
@@ -113,6 +134,9 @@ export default function TabLayout() {
         <Tabs.Screen
           name="profile"
           options={{
+            tabBarIcon: ({ color, size }) => (
+              <ProfileIcon width={size} height={size} color={color} />
+            ),
             title: "Profile",
           }}
         />
@@ -134,12 +158,12 @@ export default function TabLayout() {
           router.push("/login");
         }}
       />
-    </SafeAreaView>
+    </>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
+  tabBar: {
+    display: "none",
   },
 });

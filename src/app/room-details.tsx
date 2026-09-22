@@ -1,8 +1,10 @@
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
-import { Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 
-import FloorPlan from "../../components/FloorPlan";
+import ProceedArrow from "../../assets/design/icons/proceed-arrow.svg";
+import FloorPlan from "@/components/FloorPlan";
+import OfficialPage, { officialDetailStyles } from "@/components/OfficialPage";
 import {
   campusFeatureSummaries,
   getBuildingIdForRoom,
@@ -25,7 +27,8 @@ export default function RoomDetailsScreen() {
     featureType?: string;
   }>();
   const [roomEdits, setRoomEdits] = useState<Record<string, BuildingRoom>>({});
-  const resolvedBuildingId = buildingId || (featureId ? getBuildingIdForRoom(featureId) : undefined);
+  const resolvedBuildingId =
+    buildingId || (featureId ? getBuildingIdForRoom(featureId) : undefined);
   const requestedRoomId = roomId ?? featureId;
   const mappedRoom = useMemo(
     () =>
@@ -39,11 +42,19 @@ export default function RoomDetailsScreen() {
     [resolvedBuildingId, requestedRoomId, roomEdits],
   );
   const room = useMemo(
-    () => mappedRoom ?? campusFeatureSummaries.find((feature) => feature.id === featureId && feature.type === featureType),
-    [mappedRoom, featureId, featureType],
+    () =>
+      mappedRoom ??
+      campusFeatureSummaries.find(
+        (feature) => feature.id === featureId && feature.type === featureType,
+      ),
+    [featureId, featureType, mappedRoom],
   );
   const building = useMemo(
-    () => campusFeatureSummaries.find((feature) => feature.id === resolvedBuildingId && feature.type === "building"),
+    () =>
+      campusFeatureSummaries.find(
+        (feature) =>
+          feature.id === resolvedBuildingId && feature.type === "building",
+      ),
     [resolvedBuildingId],
   );
   const floorRooms = useMemo(
@@ -78,31 +89,28 @@ export default function RoomDetailsScreen() {
 
   if (!room) {
     return (
-      <View style={styles.center}>
-        <Text style={styles.title}>Room not found</Text>
-        <Pressable style={styles.button} onPress={() => router.back()}>
-          <Text style={styles.buttonText}>Go Back</Text>
+      <OfficialPage title="Room not found" subtitle="This room is unavailable.">
+        <Pressable style={officialDetailStyles.button} onPress={() => router.back()}>
+          <Text style={officialDetailStyles.buttonText}>Go Back</Text>
         </Pressable>
-      </View>
+      </OfficialPage>
     );
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>{room.name}</Text>
-      <Text style={styles.meta}>{building?.name ?? "Campus building"} {room.floor ? `• ${room.floor}` : ""}</Text>
-
+    <OfficialPage
+      title={room.name}
+      subtitle={`${building?.name ?? "Campus building"}${room.floor ? ` - ${room.floor}` : ""}`}
+    >
       <Image source={{ uri: sampleClassroomPhoto }} style={styles.photo} />
 
-      <View style={styles.infoBox}>
-        <Text style={styles.infoLabel}>Room information</Text>
-        <Text style={styles.infoValue}>{room.description ?? "Information for this room will be added soon."}</Text>
-      </View>
+      <InfoBox title="Room information">
+        {room.description ?? "Information for this room will be added soon."}
+      </InfoBox>
 
-      <View style={styles.infoBox}>
-        <Text style={styles.infoLabel}>Directions</Text>
-        <Text style={styles.infoValue}>{room.directions ?? "Open the map to view the room location."}</Text>
-      </View>
+      <InfoBox title="Directions">
+        {room.directions ?? "Open the map to view the room location."}
+      </InfoBox>
 
       {mappedRoom && floorRooms.length ? (
         <Pressable
@@ -121,12 +129,14 @@ export default function RoomDetailsScreen() {
           style={styles.floorPlanButton}
         >
           <FloorPlan rooms={floorRooms} selectedRoomId={mappedRoom.id} />
-          <Text style={styles.floorPlanHint}>Tap the floor plan to view it clearly.</Text>
+          <Text style={styles.floorPlanHint}>
+            Tap the floor plan to view it clearly.
+          </Text>
         </Pressable>
       ) : null}
 
       <Pressable
-        style={styles.button}
+        style={[officialDetailStyles.button, styles.mapButton]}
         onPress={() =>
           router.push({
             pathname: "/(tabs)/map",
@@ -138,23 +148,56 @@ export default function RoomDetailsScreen() {
           })
         }
       >
-        <Text style={styles.buttonText}>View on Map</Text>
+        <Text style={officialDetailStyles.buttonText}>View on Map</Text>
+        <ProceedArrow width={16} height={19} accessible={false} />
       </Pressable>
-    </ScrollView>
+    </OfficialPage>
+  );
+}
+
+function InfoBox({ children, title }: { children: string; title: string }) {
+  return (
+    <View style={styles.infoBox}>
+      <Text style={styles.infoLabel}>{title}</Text>
+      <Text style={officialDetailStyles.bodyText}>{children}</Text>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { paddingHorizontal: 20, paddingBottom: 32, paddingTop: 44 },
-  center: { flex: 1, justifyContent: "center", alignItems: "center", gap: 16, padding: 24 },
-  title: { color: "#111827", fontSize: 24, fontWeight: "700" },
-  meta: { color: "#6b7280", marginTop: 6 },
-  photo: { borderRadius: 6, height: 180, marginTop: 20, width: "100%" },
-  infoBox: { borderWidth: 1, borderColor: "#d1d5db", borderRadius: 6, marginTop: 20, padding: 14 },
-  infoLabel: { color: "#374151", fontSize: 13, fontWeight: "700", marginBottom: 6, textTransform: "uppercase" },
-  infoValue: { color: "#374151", lineHeight: 21 },
-  floorPlanButton: { marginTop: 20 },
-  floorPlanHint: { color: "#4b5563", fontSize: 13, marginTop: 10, textAlign: "center" },
-  button: { alignItems: "center", backgroundColor: "#111827", borderRadius: 6, marginTop: 24, paddingHorizontal: 16, paddingVertical: 13 },
-  buttonText: { color: "#ffffff", fontSize: 15, fontWeight: "700" },
+  photo: {
+    borderRadius: 10,
+    height: 180,
+    width: "100%",
+  },
+
+  infoBox: {
+    ...officialDetailStyles.card,
+    marginTop: 14,
+    padding: 14,
+  },
+
+  infoLabel: {
+    color: "#AF2532",
+    fontFamily: "HelpBold",
+    fontSize: 13,
+    marginBottom: 6,
+    textTransform: "uppercase",
+  },
+
+  floorPlanButton: {
+    marginTop: 20,
+  },
+
+  floorPlanHint: {
+    color: "#6C757D",
+    fontFamily: "HelpRegular",
+    fontSize: 13,
+    marginTop: 10,
+    textAlign: "center",
+  },
+
+  mapButton: {
+    marginTop: 24,
+  },
 });

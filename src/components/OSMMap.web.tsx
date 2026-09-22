@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef } from "react";
 
-import benchesData from "../src/data/benches.json";
-import buildingsData from "../src/data/buildings.json";
-import campusBoundary from "../src/data/campusBoundary";
-import locationsData from "../src/data/locations.json";
-import mapFeaturesData from "../src/data/mapFeatures.json";
+import benchesData from "@/data/benches.json";
+import buildingsData from "@/data/buildings.json";
+import campusBoundary from "@/data/campusBoundary";
+import locationsData from "@/data/locations.json";
+import mapFeaturesData from "@/data/mapFeatures.json";
 import type { CurrentMapLocation, SelectedMapFeature } from "./OSMMap";
 
 type OSMMapProps = {

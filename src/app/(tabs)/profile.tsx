@@ -1,8 +1,22 @@
+import { Image } from "expo-image";
 import { router, useFocusEffect } from "expo-router";
+import { StatusBar } from "expo-status-bar";
 import { useCallback, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, Text, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
-import packageJson from "../../../package.json";
+import {
+  OfficialBottomNavigation,
+  OfficialProfileActionCard,
+} from "@/components/OfficialDesign";
+import LimitedAccessModal from "@/components/LimitedAccessModal";
+import Background from "../../../assets/design/backgrounds/sixBg.svg";
+import HelpBackground from "../../../assets/design/backgrounds/ninthBg.svg";
+import Avatar from "../../../assets/design/icons/profile-avatar.svg";
+import Google from "../../../assets/design/logos/google.svg";
+import HelpIcon from "../../../assets/design/icons/profile.svg";
+import LogoutIcon from "../../../assets/design/icons/logout.svg";
+import UserIcon from "../../../assets/design/icons/user.svg";
 import { signOutUser } from "../../services/userAuth";
 import {
   clearStoredUserSession,
@@ -13,62 +27,63 @@ import {
   type AppAccessMode,
   type StoredUserSession,
 } from "../../utils/appSession";
+import { navigateToTab } from "@/utils/navigation";
+import { styles as helpStyles } from "../../styles/official/helpScreen.styles";
+import { styles } from "../../styles/official/profileScreen.styles";
 
-const faqs = [
+const universitySeal = require("../../../assets/design/logos/UM.png");
+const umvcFindLogo = require("../../../assets/design/logos/UMVC-Find.png");
+
+const helpIntroduction =
+  "UMVCFIND is a campus wayfinding app for locating places around UMVC, including buildings, rooms, offices, laboratories, facilities, food areas, and services.";
+
+const helpSections = [
   {
-    question: "What is UMVCFIND for?",
-    answer:
-      "UMVCFIND helps students, staff, and visitors find UMVC campus buildings, rooms, offices, laboratories, facilities, food areas, and other important locations.",
+    id: "purpose",
+    title: "App Purpose",
+    text: "The app helps users start from the dashboard and open the campus map to view, identify, and highlight selected buildings or rooms.",
   },
   {
-    question: "Do I need an account?",
-    answer:
-      "No. Guests can use the dashboard and campus map. Other features can be made available after signing in or in a later version.",
+    id: "dashboard",
+    title: "How To Use Dashboard",
+    text: "Open the Dashboard to access the main guest options. From there, guests can continue to the campus map and view available campus information.",
   },
   {
-    question: "Why did a building name or detail change?",
-    answer:
-      "Campus information may be updated to keep names, descriptions, and room details accurate.",
+    id: "map",
+    title: "How To Use Map",
+    text: "Open the Map tab to view campus places. Tap a highlighted place to see its details, then open its full information page or floor and room list when available.",
   },
   {
-    question: "Can I use the app without internet?",
-    answer:
-      "Some information may still appear if it was already loaded, but map tiles, updated details, and current location features work best with an internet connection.",
+    id: "guest",
+    title: "Guest Access",
+    text: "Guest users can use the Dashboard and Map without an account. Additional screens are intended for signed-in access or future system updates.",
   },
   {
-    question: "Why is my current location unavailable?",
-    answer:
-      "Current location depends on phone/browser permission, GPS availability, internet connection, and device settings. The app can still be used without location access.",
+    id: "location",
+    title: "Location Information",
+    text: "Location details are provided to help users identify campus places more easily, including names, floors, nearby areas, descriptions, and navigation notes.",
   },
   {
-    question: "Does UMVCFIND give turn-by-turn directions?",
-    answer:
-      "Not yet. The current version highlights campus places on the map and shows location details. Full step-by-step routing can be added in a later version.",
+    id: "contact",
+    title: "Contact / Help",
+    text: "For incorrect building names, room details, or map information, contact the assigned campus office representative.",
   },
 ];
 
 export default function ProfileScreen() {
   const [isHelpOpen, setIsHelpOpen] = useState(false);
+  const [isLimitedAccessOpen, setIsLimitedAccessOpen] = useState(false);
   const [accessMode, setAccessModeState] = useState<AppAccessMode>("guest");
-  const [userSession, setUserSession] =
-    useState<StoredUserSession | null>(null);
+  const [userSession, setUserSession] = useState<StoredUserSession | null>(null);
   const isGuest = isGuestMode(accessMode);
   const displayName =
-    userSession?.displayName ??
-    userSession?.email?.split("@")[0] ??
-    "Signed-in User";
-  const profileInitial = isGuest
-    ? "G"
-    : displayName.trim().charAt(0).toUpperCase() || "U";
+    userSession?.displayName ?? userSession?.email?.split("@")[0] ?? "Guest User";
 
   useFocusEffect(
     useCallback(() => {
       let isActive = true;
 
-      void Promise.all([
-        getAppAccessMode(),
-        getStoredUserSession(),
-      ]).then(([mode, session]) => {
+      void Promise.all([getAppAccessMode(), getStoredUserSession()]).then(([mode, session]) => {
         if (isActive) {
           setAccessModeState(mode);
           setUserSession(session);
@@ -90,428 +105,136 @@ export default function ProfileScreen() {
     router.replace("/login");
   };
 
+  const navigate = (name: string) => {
+    navigateToTab(name, {
+      currentTab: "Profile",
+      isGuest,
+      onOpenLimitedAccess: () => setIsLimitedAccessOpen(true),
+      onSameTab: () => setIsHelpOpen(false),
+    });
+  };
+
   if (isHelpOpen) {
     return (
-      <ScrollView
-        contentContainerStyle={styles.helpContent}
-        style={styles.container}
-        showsVerticalScrollIndicator={false}
-      >
-        <Pressable
-          style={styles.backButton}
-          onPress={() => setIsHelpOpen(false)}
-        >
-          <Text style={styles.backButtonText}>Back to Profile</Text>
-        </Pressable>
-
-        <Text style={styles.helpTitle}>Help & About</Text>
-        <Text style={styles.helpIntro}>
-          UMVCFIND is a campus wayfinding app for locating places around
-          UMVC, including buildings, rooms, offices, laboratories, facilities,
-          food areas, and services.
-        </Text>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>App Purpose</Text>
-          <Text style={styles.bodyText}>
-            The app helps users start from the dashboard and open the campus
-            map to view, identify, and highlight selected buildings or rooms.
-          </Text>
+      <View style={helpStyles.screen}>
+        <StatusBar style="light" />
+        <SafeAreaView edges={["top", "left", "right"]} style={helpStyles.header}>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => setIsHelpOpen(false)}
+            style={({ pressed }) => [helpStyles.backButton, pressed && helpStyles.pressed]}
+          >
+            <Text style={[helpStyles.backText, helpStyles.boldFont]}>Back to Profile</Text>
+          </Pressable>
+        </SafeAreaView>
+        <View style={helpStyles.goldDivider} />
+        <View style={helpStyles.body}>
+          <View style={helpStyles.background} pointerEvents="none">
+            <HelpBackground
+              width="100%"
+              height="100%"
+              viewBox="0 180 412 550"
+              preserveAspectRatio="xMidYMid slice"
+            />
+          </View>
+          <SafeAreaView edges={["left", "right", "bottom"]} style={helpStyles.body}>
+            <ScrollView contentContainerStyle={helpStyles.content} showsVerticalScrollIndicator={false}>
+              <Text accessibilityRole="header" style={[helpStyles.heading, helpStyles.boldFont]}>
+                Help & About
+              </Text>
+              <Text style={[helpStyles.introduction, helpStyles.regularFont]}>
+                {helpIntroduction}
+              </Text>
+              {helpSections.map((section) => (
+                <View key={section.id} style={helpStyles.section}>
+                  <View
+                    style={[
+                      helpStyles.sectionHeading,
+                      section.id === "dashboard" && helpStyles.alignRight,
+                    ]}
+                  >
+                    <Text accessibilityRole="header" style={[helpStyles.heading, helpStyles.boldFont]}>
+                      {section.title}
+                    </Text>
+                    {section.id === "purpose" ? (
+                      <Image
+                        source={umvcFindLogo}
+                        contentFit="contain"
+                        style={helpStyles.logo}
+                        accessibilityLabel="UMVC Find logo"
+                      />
+                    ) : null}
+                  </View>
+                  <View style={helpStyles.card}>
+                    <Text style={[helpStyles.copy, helpStyles.regularFont]}>{section.text}</Text>
+                  </View>
+                </View>
+              ))}
+            </ScrollView>
+          </SafeAreaView>
         </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>How To Use Dashboard</Text>
-          <Text style={styles.bodyText}>
-            Open the Dashboard to access the main guest options. From there,
-            guests can continue to the campus map and view available campus
-            information.
-          </Text>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>How To Use Map</Text>
-          <Text style={styles.bodyText}>
-            Open the Map tab to view campus places. Tap a highlighted place to
-            see its details, then open its full information page or floor and
-            room list when available. If location permission is enabled, the map
-            can also show your current position.
-          </Text>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Guest Access</Text>
-          <Text style={styles.bodyText}>
-            Guest users can use the Dashboard and Map without an account.
-            Additional screens are intended for signed-in access or future
-            system updates.
-          </Text>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Location Information</Text>
-          <Text style={styles.bodyText}>
-            Location details are provided to help users identify campus places
-            more easily. Information may include the place name, category,
-            floor, nearby area, description, and helpful navigation notes.
-          </Text>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>FAQs</Text>
-          {faqs.map((faq) => (
-            <View key={faq.question} style={styles.faqItem}>
-              <Text style={styles.question}>{faq.question}</Text>
-              <Text style={styles.bodyText}>{faq.answer}</Text>
-            </View>
-          ))}
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Contact / Help</Text>
-          <Text style={styles.bodyText}>
-            For incorrect building names, room details, or map information,
-            contact the assigned campus office representative.
-          </Text>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>About</Text>
-          <Text style={styles.bodyText}>UMVCFIND</Text>
-          <Text style={styles.bodyText}>Version {packageJson.version}</Text>
-          <Text style={styles.bodyText}>
-            Built for UMVC campus wayfinding and location discovery.
-          </Text>
-        </View>
-      </ScrollView>
+      </View>
     );
   }
 
   return (
-    <ScrollView
-      contentContainerStyle={styles.content}
-      style={styles.container}
-      showsVerticalScrollIndicator={false}
-    >
-      <View style={styles.header}>
-        <Text style={styles.brand}>UMVC FIND</Text>
-        <Text style={styles.subtitle}>Campus navigation profile</Text>
+    <View style={styles.screen}>
+      <StatusBar style="light" />
+      <View style={styles.background} pointerEvents="none">
+        <Background width="100%" height="100%" preserveAspectRatio="none" />
       </View>
-
-      <View style={styles.profileCard}>
-        <View style={styles.avatar}>
-          <Text style={styles.avatarText}>{profileInitial}</Text>
-        </View>
-        <Text style={styles.name}>
-          {isGuest ? "Guest User" : displayName}
-        </Text>
-        <Text style={styles.email}>
-          {isGuest
-            ? "Sign in to unlock the full app experience."
-            : userSession?.email ?? "Signed in with Google"}
-        </Text>
-        <View style={styles.statusBadge}>
-          <Text style={styles.statusBadgeText}>
-            {isGuest ? "Guest Mode" : "Signed In"}
-          </Text>
-        </View>
-      </View>
-
-      <View style={styles.optionList}>
-        <Pressable
-          style={styles.optionItem}
-          onPress={isGuest ? () => router.replace("/login") : handleLogout}
-        >
-          <View style={styles.optionIcon}>
-            <Text style={styles.optionIconText}>→</Text>
-          </View>
-          <View style={styles.optionText}>
-            <Text style={styles.optionTitle}>
-              {isGuest ? "Login" : "Log Out"}
-            </Text>
-            <Text style={styles.optionDescription}>
-              {isGuest
-                ? "Sign in with Google to unlock more features"
-                : "Sign out of your Google account on this app"}
+      <SafeAreaView style={styles.safe} edges={["top", "left", "right"]}>
+        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+          <View style={styles.header}>
+            <Image
+              source={universitySeal}
+              style={styles.seal}
+              contentFit="contain"
+              accessibilityLabel="University of Mindanao seal"
+            />
+            <Text style={[styles.brand, styles.brandFont]} numberOfLines={1} adjustsFontSizeToFit>
+              UMVC <Text style={styles.gold}>FIND</Text>
             </Text>
           </View>
-          <Text style={styles.optionArrow}>›</Text>
-        </Pressable>
-
-        {isGuest ? (
-          <Pressable
-            disabled
-            style={[styles.optionItem, styles.optionItemDisabled]}
-          >
-            <View style={[styles.optionIcon, styles.optionIconDisabled]}>
-              <Text style={styles.optionIconTextDisabled}>+</Text>
-            </View>
-            <View style={styles.optionText}>
-              <Text style={[styles.optionTitle, styles.optionTitleDisabled]}>
-                Create Account
-              </Text>
-              <Text style={styles.optionDescription}>
-                Use Google login to continue as a signed-in user
+          <View style={styles.identity}>
+            <Avatar width={121} height={120} accessibilityLabel="Default profile avatar" />
+            <Text style={[styles.name, styles.nameFont]}>{isGuest ? "Guest User" : displayName}</Text>
+            <Text style={[styles.email, styles.mediumFont]}>
+              {isGuest ? "Sign in to unlock the full app experience." : userSession?.email}
+            </Text>
+            <View style={styles.badge}>
+              {isGuest ? <UserIcon width={17} height={17} accessible={false} /> : <Google width={17} height={17} accessible={false} />}
+              <Text style={[styles.badgeText, styles.mediumFont]}>
+                {isGuest ? "GUEST MODE" : "SIGNED IN"}
               </Text>
             </View>
-            <Text style={styles.comingSoon}>Soon</Text>
-          </Pressable>
-        ) : null}
+          </View>
+          <View style={styles.actions}>
+            <OfficialProfileActionCard
+              title="Help & About"
+              description="FAQs, contact us, and app information"
+              Icon={HelpIcon}
+              onPress={() => setIsHelpOpen(true)}
+            />
+            <OfficialProfileActionCard
+              title={isGuest ? "Login" : "Log Out"}
+              description={isGuest ? "Sign in with Google to unlock more features" : "Sign out of your account"}
+              Icon={isGuest ? UserIcon : LogoutIcon}
+              onPress={isGuest ? () => router.replace("/login") : handleLogout}
+            />
+          </View>
+        </ScrollView>
+        <OfficialBottomNavigation activeItem="Profile" onSelect={navigate} />
+      </SafeAreaView>
 
-        <Pressable
-          style={styles.optionItem}
-          onPress={() => setIsHelpOpen(true)}
-        >
-          <View style={styles.optionIcon}>
-            <Text style={styles.optionIconText}>?</Text>
-          </View>
-          <View style={styles.optionText}>
-            <Text style={styles.optionTitle}>Help & About</Text>
-            <Text style={styles.optionDescription}>
-              FAQs, contact information, and app details
-            </Text>
-          </View>
-          <Text style={styles.optionArrow}>›</Text>
-        </Pressable>
-      </View>
-    </ScrollView>
+      <LimitedAccessModal
+        visible={isLimitedAccessOpen}
+        onClose={() => setIsLimitedAccessOpen(false)}
+        onLogin={() => {
+          setIsLimitedAccessOpen(false);
+          router.push("/login");
+        }}
+      />
+    </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#f8fafc",
-  },
-
-  content: {
-    paddingBottom: 32,
-  },
-
-  header: {
-    backgroundColor: "#b91c2b",
-    borderBottomColor: "#facc15",
-    borderBottomWidth: 8,
-    paddingBottom: 46,
-    paddingHorizontal: 24,
-    paddingTop: 42,
-  },
-
-  brand: {
-    color: "white",
-    fontSize: 28,
-    fontWeight: "900",
-    letterSpacing: 0,
-  },
-
-  subtitle: {
-    color: "#fee2e2",
-    fontSize: 14,
-    fontWeight: "600",
-    marginTop: 4,
-  },
-
-  profileCard: {
-    alignItems: "center",
-    backgroundColor: "white",
-    borderColor: "#e5e7eb",
-    borderRadius: 8,
-    borderWidth: 1,
-    marginHorizontal: 20,
-    marginTop: -28,
-    padding: 20,
-  },
-
-  avatar: {
-    alignItems: "center",
-    backgroundColor: "#e0edff",
-    borderColor: "white",
-    borderRadius: 44,
-    borderWidth: 4,
-    height: 88,
-    justifyContent: "center",
-    marginBottom: 10,
-    width: 88,
-  },
-
-  avatarText: {
-    color: "#2563eb",
-    fontSize: 42,
-    fontWeight: "900",
-  },
-
-  name: {
-    color: "#111827",
-    fontSize: 20,
-    fontWeight: "800",
-  },
-
-  email: {
-    color: "#6b7280",
-    fontSize: 13,
-    marginTop: 4,
-    textAlign: "center",
-  },
-
-  statusBadge: {
-    backgroundColor: "#f3f4f6",
-    borderColor: "#e5e7eb",
-    borderRadius: 8,
-    borderWidth: 1,
-    marginTop: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-  },
-
-  statusBadgeText: {
-    color: "#374151",
-    fontSize: 12,
-    fontWeight: "800",
-    textTransform: "uppercase",
-  },
-
-  optionList: {
-    gap: 12,
-    marginTop: 18,
-    paddingHorizontal: 20,
-  },
-
-  optionItem: {
-    alignItems: "center",
-    backgroundColor: "white",
-    borderColor: "#e5e7eb",
-    borderRadius: 8,
-    borderWidth: 1,
-    flexDirection: "row",
-    padding: 14,
-  },
-
-  optionItemDisabled: {
-    opacity: 0.72,
-  },
-
-  optionIcon: {
-    alignItems: "center",
-    backgroundColor: "#fef3c7",
-    borderRadius: 8,
-    height: 42,
-    justifyContent: "center",
-    marginRight: 12,
-    width: 42,
-  },
-
-  optionIconText: {
-    color: "#b91c2b",
-    fontSize: 24,
-    fontWeight: "900",
-  },
-
-  optionIconDisabled: {
-    backgroundColor: "#f3f4f6",
-  },
-
-  optionIconTextDisabled: {
-    color: "#9ca3af",
-    fontSize: 24,
-    fontWeight: "900",
-  },
-
-  optionText: {
-    flex: 1,
-  },
-
-  optionTitle: {
-    color: "#111827",
-    fontSize: 16,
-    fontWeight: "800",
-    marginBottom: 2,
-  },
-
-  optionTitleDisabled: {
-    color: "#6b7280",
-  },
-
-  optionDescription: {
-    color: "#6b7280",
-    fontSize: 12,
-    lineHeight: 17,
-  },
-
-  optionArrow: {
-    color: "#9ca3af",
-    fontSize: 30,
-    marginLeft: 10,
-  },
-
-  comingSoon: {
-    color: "#9ca3af",
-    fontSize: 12,
-    fontWeight: "800",
-    marginLeft: 10,
-    textTransform: "uppercase",
-  },
-
-  helpContent: {
-    padding: 20,
-    paddingBottom: 36,
-  },
-
-  backButton: {
-    alignSelf: "flex-start",
-    marginBottom: 18,
-    paddingVertical: 6,
-  },
-
-  backButtonText: {
-    color: "#2563eb",
-    fontSize: 15,
-    fontWeight: "700",
-  },
-
-  helpTitle: {
-    color: "#111827",
-    fontSize: 28,
-    fontWeight: "900",
-    marginBottom: 8,
-  },
-
-  helpIntro: {
-    color: "#4b5563",
-    fontSize: 15,
-    lineHeight: 22,
-    marginBottom: 20,
-  },
-
-  section: {
-    backgroundColor: "white",
-    borderColor: "#e5e7eb",
-    borderRadius: 8,
-    borderWidth: 1,
-    marginBottom: 12,
-    padding: 14,
-  },
-
-  sectionTitle: {
-    color: "#111827",
-    fontSize: 17,
-    fontWeight: "800",
-    marginBottom: 8,
-  },
-
-  bodyText: {
-    color: "#4b5563",
-    fontSize: 14,
-    lineHeight: 21,
-    marginBottom: 4,
-  },
-
-  faqItem: {
-    marginBottom: 12,
-  },
-
-  question: {
-    color: "#111827",
-    fontSize: 14,
-    fontWeight: "800",
-    marginBottom: 3,
-  },
-});

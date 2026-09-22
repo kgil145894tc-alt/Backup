@@ -1,8 +1,9 @@
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 
-import FloorPlan from "../../components/FloorPlan";
+import FloorPlan from "@/components/FloorPlan";
+import OfficialPage, { officialDetailStyles } from "@/components/OfficialPage";
 import type { BuildingRoom } from "../data/campusData";
 import { loadCampusData } from "../services/campusDataStore";
 import {
@@ -51,44 +52,50 @@ export default function RoomMapScreen() {
 
   if (!room || !rooms.length) {
     return (
-      <View style={styles.center}>
-        <Text style={styles.title}>Floor plan not found</Text>
-        <Pressable style={styles.button} onPress={() => router.back()}>
-          <Text style={styles.buttonText}>Go Back</Text>
+      <OfficialPage title="Floor plan not found" subtitle="This floor plan is unavailable.">
+        <Pressable style={officialDetailStyles.button} onPress={() => router.back()}>
+          <Text style={officialDetailStyles.buttonText}>Go Back</Text>
         </Pressable>
-      </View>
+      </OfficialPage>
     );
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>{room.name}</Text>
-      <Text style={styles.subtitle}>{room.floor}</Text>
+    <OfficialPage title={room.name} subtitle={room.floor}>
       <View style={styles.planWrapper}>
         <FloorPlan rooms={rooms} selectedRoomId={room.id} />
       </View>
       <View style={styles.footer}>
-        <Text style={styles.helpText}>The highlighted room is your selected location.</Text>
+        <Text style={officialDetailStyles.bodyText}>
+          The highlighted room is your selected location.
+        </Text>
         <Pressable
           accessibilityRole="button"
-          style={styles.button}
-          onPress={() => router.replace("/map")}
+          style={[officialDetailStyles.button, styles.mapButton]}
+          onPress={() => router.replace("/(tabs)/map")}
         >
-          <Text style={styles.buttonText}>Back to Map</Text>
+          <Text style={officialDetailStyles.buttonText}>Back to Map</Text>
         </Pressable>
       </View>
-    </ScrollView>
+    </OfficialPage>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flexGrow: 1, padding: 20 },
-  center: { alignItems: "center", flex: 1, gap: 16, justifyContent: "center", padding: 24 },
-  title: { color: "#111827", fontSize: 24, fontWeight: "700" },
-  subtitle: { color: "#6b7280", marginTop: 5 },
-  planWrapper: { flex: 1, justifyContent: "center", marginTop: 24 },
-  footer: { marginTop: 28 },
-  helpText: { color: "#4b5563", fontSize: 13, lineHeight: 18, marginBottom: 12 },
-  button: { alignItems: "center", backgroundColor: "#111827", borderRadius: 6, paddingVertical: 13 },
-  buttonText: { color: "#ffffff", fontWeight: "700" },
+  planWrapper: {
+    ...officialDetailStyles.card,
+    flex: 1,
+    justifyContent: "center",
+    minHeight: 360,
+    padding: 12,
+  },
+
+  footer: {
+    gap: 12,
+    marginTop: 20,
+  },
+
+  mapButton: {
+    marginTop: 0,
+  },
 });

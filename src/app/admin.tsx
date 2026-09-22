@@ -19,8 +19,6 @@ import type { CampusNotification } from "../data/notifications";
 import {
   loginAdmin,
   logoutAdmin,
-  PROTOTYPE_ADMIN_EMAIL,
-  PROTOTYPE_ADMIN_PASSWORD,
   watchFirebaseAdminSession,
   type AdminSession,
 } from "../services/adminAuth";
@@ -54,7 +52,6 @@ const notificationCategoryOptions: CampusNotification["category"][] = [
   "room",
   "maintenance",
 ];
-const PROTOTYPE_ADMIN_ID = "prototype-admin";
 
 type NotificationDraft = {
   category: CampusNotification["category"];
@@ -212,7 +209,7 @@ export default function AdminScreen() {
     try {
       await updateLocation(
         adminLocationToFirestore(location),
-        PROTOTYPE_ADMIN_ID,
+        adminSession?.uid ?? "admin",
       );
       const notificationCopy = getLocationNotificationCopy(location);
 
@@ -271,7 +268,7 @@ export default function AdminScreen() {
     }
 
     try {
-      await updateRoom(buildingRoomToFirestore(room), PROTOTYPE_ADMIN_ID);
+      await updateRoom(buildingRoomToFirestore(room), adminSession?.uid ?? "admin");
       await createNotification({
         id: `room-${room.buildingId}-${room.id}`,
         title: "Room Update",
@@ -333,7 +330,7 @@ export default function AdminScreen() {
       await createNotification({
         id: `manual-${notificationDraft.category}-${Date.now()}`,
         category: notificationDraft.category,
-        createdBy: adminSession?.uid ?? PROTOTYPE_ADMIN_ID,
+        createdBy: adminSession?.uid ?? "admin",
         locationName: relatedLocation?.name,
         locationSubtitle: relatedLocation?.category,
         message,
@@ -406,10 +403,6 @@ export default function AdminScreen() {
           <Text style={styles.loginTitle}>Admin Login</Text>
           <Text style={styles.loginSubtitle}>
             Access the administration panel
-          </Text>
-          <Text style={styles.prototypeCredentials}>
-            Firebase admin login is used when configured. Prototype fallback:{" "}
-            {PROTOTYPE_ADMIN_EMAIL} / {PROTOTYPE_ADMIN_PASSWORD}
           </Text>
 
           <Text style={styles.inputLabel}>Email / Admin</Text>

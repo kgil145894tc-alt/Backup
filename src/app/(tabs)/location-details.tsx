@@ -4,8 +4,10 @@ import {
   useLocalSearchParams,
 } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 
+import ProceedArrow from "../../../assets/design/icons/proceed-arrow.svg";
+import OfficialPage, { officialDetailStyles } from "@/components/OfficialPage";
 import { loadCampusData } from "../../services/campusDataStore";
 import {
   initialAdminLocations,
@@ -73,29 +75,16 @@ export default function LocationDetailsScreen() {
 
   if (!feature) {
     return (
-      <View style={styles.emptyContainer}>
-        <Text style={styles.emptyTitle}>Location not found</Text>
-        <Text style={styles.emptyText}>
-          The selected campus place is missing or no longer available.
-        </Text>
-        <Pressable
-          style={styles.secondaryButton}
-          onPress={() => router.back()}
-        >
-          <Text style={styles.secondaryButtonText}>Go Back</Text>
+      <OfficialPage title="Location not found" subtitle="This campus place is unavailable.">
+        <Pressable style={officialDetailStyles.button} onPress={() => router.back()}>
+          <Text style={officialDetailStyles.buttonText}>Go Back</Text>
         </Pressable>
-      </View>
+      </OfficialPage>
     );
   }
 
   return (
-    <ScrollView
-      contentContainerStyle={styles.content}
-      style={styles.container}
-      showsVerticalScrollIndicator={false}
-    >
-      <Text style={styles.eyebrow}>{feature.category}</Text>
-      <Text style={styles.title}>{feature.name}</Text>
+    <OfficialPage title={feature.name} subtitle={feature.category}>
       {isMaintenanceAdminLocation(feature) ? (
         <View style={styles.statusNotice}>
           <Text style={styles.statusNoticeText}>
@@ -105,29 +94,12 @@ export default function LocationDetailsScreen() {
       ) : null}
 
       <View style={styles.detailGrid}>
-        <View style={styles.detailItem}>
-          <Text style={styles.detailLabel}>Type</Text>
-          <Text style={styles.detailValue}>{feature.type}</Text>
-        </View>
-
-        <View style={styles.detailItem}>
-          <Text style={styles.detailLabel}>Category</Text>
-          <Text style={styles.detailValue}>{feature.category}</Text>
-        </View>
-
+        <DetailItem label="Type" value={feature.type} />
+        <DetailItem label="Category" value={feature.category} />
         {feature.floors !== undefined ? (
-          <View style={styles.detailItem}>
-            <Text style={styles.detailLabel}>Floors</Text>
-            <Text style={styles.detailValue}>{feature.floors}</Text>
-          </View>
+          <DetailItem label="Floors" value={String(feature.floors)} />
         ) : null}
-
-        {feature.floor ? (
-          <View style={styles.detailItem}>
-            <Text style={styles.detailLabel}>Floor</Text>
-            <Text style={styles.detailValue}>{feature.floor}</Text>
-          </View>
-        ) : null}
+        {feature.floor ? <DetailItem label="Floor" value={feature.floor} /> : null}
       </View>
 
       {feature.aliases?.length ? (
@@ -143,41 +115,32 @@ export default function LocationDetailsScreen() {
         </View>
       ) : null}
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Description</Text>
-        <Text style={styles.description}>
-          {feature.description ??
-            "No description has been added for this location yet."}
-        </Text>
-      </View>
+      <InfoSection title="Description">
+        {feature.description ??
+          "No description has been added for this location yet."}
+      </InfoSection>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Navigation</Text>
-        <Text style={styles.description}>
-          {feature.directions ??
-            "Open this place on the campus map to highlight its exact building or room shape."}
-        </Text>
-      </View>
+      <InfoSection title="Navigation">
+        {feature.directions ??
+          "Open this place on the campus map to highlight its exact building or room shape."}
+      </InfoSection>
 
       {feature.nearby ? (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Nearby</Text>
-          <Text style={styles.description}>{feature.nearby}</Text>
-        </View>
+        <InfoSection title="Nearby">{feature.nearby}</InfoSection>
       ) : null}
 
       {feature.accessibility ? (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Accessibility</Text>
-          <Text style={styles.description}>{feature.accessibility}</Text>
-        </View>
+        <InfoSection title="Accessibility">{feature.accessibility}</InfoSection>
       ) : null}
 
       <Pressable
-        style={styles.primaryButton}
+        style={officialDetailStyles.button}
         onPress={() => {
           if (feature.type === "building") {
-            router.push({ pathname: "/building-floors", params: { buildingId: feature.id } });
+            router.push({
+              pathname: "/building-floors",
+              params: { buildingId: feature.id },
+            });
             return;
           }
 
@@ -191,44 +154,40 @@ export default function LocationDetailsScreen() {
           });
         }}
       >
-        <Text style={styles.primaryButtonText}>
-          {feature.type === "building"
-            ? "View Floors and Rooms"
-            : "View on Map"}
+        <Text style={officialDetailStyles.buttonText}>
+          {feature.type === "building" ? "View Floors and Rooms" : "View on Map"}
         </Text>
+        <ProceedArrow width={16} height={19} accessible={false} />
       </Pressable>
-    </ScrollView>
+    </OfficialPage>
+  );
+}
+
+function DetailItem({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={styles.detailItem}>
+      <Text style={styles.detailLabel}>{label}</Text>
+      <Text style={styles.detailValue}>{value}</Text>
+    </View>
+  );
+}
+
+function InfoSection({
+  children,
+  title,
+}: {
+  children: string;
+  title: string;
+}) {
+  return (
+    <View style={styles.section}>
+      <Text style={styles.sectionTitle}>{title}</Text>
+      <Text style={officialDetailStyles.bodyText}>{children}</Text>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#f8fafc",
-  },
-
-  content: {
-    paddingHorizontal: 20,
-    paddingBottom: 36,
-    paddingTop: 44,
-  },
-
-  eyebrow: {
-    color: "#0078ff",
-    fontSize: 13,
-    fontWeight: "700",
-    marginBottom: 6,
-    textTransform: "uppercase",
-  },
-
-  title: {
-    color: "#111827",
-    fontSize: 28,
-    fontWeight: "800",
-    lineHeight: 34,
-    marginBottom: 18,
-  },
-
   detailGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -237,43 +196,40 @@ const styles = StyleSheet.create({
   },
 
   statusNotice: {
-    backgroundColor: "#f3f4f6",
-    borderColor: "#d1d5db",
-    borderRadius: 8,
+    backgroundColor: "#F7E5E3",
+    borderColor: "#CDA6AA",
+    borderRadius: 10,
     borderWidth: 1,
     marginBottom: 18,
     padding: 12,
   },
 
   statusNoticeText: {
-    color: "#374151",
+    color: "#AF2532",
+    fontFamily: "HelpBold",
     fontSize: 14,
-    fontWeight: "800",
     lineHeight: 20,
   },
 
   detailItem: {
-    backgroundColor: "white",
-    borderColor: "#e5e7eb",
-    borderRadius: 8,
-    borderWidth: 1,
+    ...officialDetailStyles.card,
     flexGrow: 1,
     minWidth: 120,
     padding: 14,
   },
 
   detailLabel: {
-    color: "#6b7280",
+    color: "#6C757D",
+    fontFamily: "HelpBold",
     fontSize: 12,
-    fontWeight: "700",
     marginBottom: 5,
     textTransform: "uppercase",
   },
 
   detailValue: {
-    color: "#111827",
+    color: "#3C4147",
+    fontFamily: "HelpBold",
     fontSize: 16,
-    fontWeight: "700",
     textTransform: "capitalize",
   },
 
@@ -288,78 +244,21 @@ const styles = StyleSheet.create({
   },
 
   aliasPill: {
-    backgroundColor: "white",
-    borderColor: "#e5e7eb",
-    borderRadius: 8,
+    backgroundColor: "#F7E5E3",
+    borderColor: "#CDA6AA",
+    borderRadius: 999,
     borderWidth: 1,
-    color: "#374151",
+    color: "#3C4147",
+    fontFamily: "HelpBold",
     fontSize: 13,
-    fontWeight: "700",
     paddingHorizontal: 10,
     paddingVertical: 6,
   },
 
   sectionTitle: {
-    color: "#111827",
+    color: "#AF2532",
+    fontFamily: "HelpBold",
     fontSize: 18,
-    fontWeight: "800",
     marginBottom: 8,
-  },
-
-  description: {
-    color: "#374151",
-    fontSize: 15,
-    lineHeight: 22,
-  },
-
-  primaryButton: {
-    alignItems: "center",
-    backgroundColor: "#0078ff",
-    borderRadius: 8,
-    paddingHorizontal: 18,
-    paddingVertical: 14,
-  },
-
-  primaryButtonText: {
-    color: "white",
-    fontSize: 16,
-    fontWeight: "800",
-  },
-
-  emptyContainer: {
-    alignItems: "center",
-    flex: 1,
-    justifyContent: "center",
-    padding: 24,
-  },
-
-  emptyTitle: {
-    color: "#111827",
-    fontSize: 22,
-    fontWeight: "800",
-    marginBottom: 8,
-    textAlign: "center",
-  },
-
-  emptyText: {
-    color: "#4b5563",
-    fontSize: 15,
-    lineHeight: 22,
-    marginBottom: 20,
-    textAlign: "center",
-  },
-
-  secondaryButton: {
-    borderColor: "#0078ff",
-    borderRadius: 8,
-    borderWidth: 1,
-    paddingHorizontal: 18,
-    paddingVertical: 12,
-  },
-
-  secondaryButtonText: {
-    color: "#0078ff",
-    fontSize: 15,
-    fontWeight: "800",
   },
 });

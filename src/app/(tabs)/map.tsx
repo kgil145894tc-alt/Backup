@@ -4,10 +4,15 @@ import {
   useLocalSearchParams,
 } from "expo-router";
 import * as Location from "expo-location";
+import { Image } from "expo-image";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
-import OSMMap from "../../../components/OSMMap";
+import CloseIcon from "../../../assets/design/icons/close.svg";
+import ProceedArrow from "../../../assets/design/icons/proceed-arrow.svg";
+import LimitedAccessModal from "@/components/LimitedAccessModal";
+import { OfficialBottomNavigation } from "@/components/OfficialDesign";
+import OSMMap from "@/components/OSMMap";
 import { loadCampusData } from "../../services/campusDataStore";
 import type {
   CurrentMapLocation,
@@ -18,7 +23,23 @@ import {
   isMaintenanceAdminLocation,
   type AdminLocation,
 } from "../../utils/adminLocations";
+import {
+  getAppAccessMode,
+  isGuestMode,
+} from "../../utils/appSession";
 import { saveCurrentHistoryItem } from "../../utils/guestHistory";
+import { navigateToTab } from "@/utils/navigation";
+
+const locationImages = {
+  academic: require("../../../assets/design/locations/category-academic.png"),
+  admin: require("../../../assets/design/locations/category-admin.png"),
+  cafeteria: require("../../../assets/design/locations/cafeteria.png"),
+  clinic: require("../../../assets/design/locations/clinic.png"),
+  default: require("../../../assets/design/locations/old-building.png"),
+  facilities: require("../../../assets/design/locations/category-facilities.png"),
+  library: require("../../../assets/design/locations/library.png"),
+  newBuilding: require("../../../assets/design/locations/new-building.png"),
+};
 
 function getFeatureFromParams(
   mapFeatures: AdminLocation[],
@@ -42,6 +63,41 @@ function toAdminLocation(feature: SelectedMapFeature): AdminLocation {
   };
 }
 
+function getLocationImage(location: AdminLocation) {
+  const name = location.name.toLowerCase();
+  const category = location.category.toLowerCase();
+
+  if (name.includes("cafeteria")) {
+    return locationImages.cafeteria;
+  }
+
+  if (name.includes("clinic")) {
+    return locationImages.clinic;
+  }
+
+  if (name.includes("library")) {
+    return locationImages.library;
+  }
+
+  if (name.includes("new") || name.includes("building 2")) {
+    return locationImages.newBuilding;
+  }
+
+  if (category.includes("academic")) {
+    return locationImages.academic;
+  }
+
+  if (category.includes("office") || category.includes("admin")) {
+    return locationImages.admin;
+  }
+
+  if (category.includes("facilit")) {
+    return locationImages.facilities;
+  }
+
+  return locationImages.default;
+}
+
 export default function MapScreen() {
   const { featureId, featureType, category, locateOnly } = useLocalSearchParams<{
     featureId?: string;
@@ -55,6 +111,8 @@ export default function MapScreen() {
   const [mapFeatures, setMapFeatures] =
     useState<AdminLocation[]>(initialAdminLocations);
   const [hiddenFeatureKeys, setHiddenFeatureKeys] = useState<string[]>([]);
+  const [isGuest, setIsGuest] = useState(false);
+  const [isLimitedAccessOpen, setIsLimitedAccessOpen] = useState(false);
 
   const initialSelectedFeature = useMemo(
     () =>
@@ -75,10 +133,14 @@ export default function MapScreen() {
     useCallback(() => {
       let isActive = true;
 
-      void loadCampusData().then((snapshot) => {
+      void Promise.all([
+        loadCampusData(),
+        getAppAccessMode(),
+      ]).then(([snapshot, mode]) => {
         if (isActive) {
           setMapFeatures(snapshot.visibleLocations);
           setHiddenFeatureKeys(snapshot.hiddenLocationKeys);
+          setIsGuest(isGuestMode(mode));
         }
       });
 
@@ -158,6 +220,15 @@ export default function MapScreen() {
       },
     });
   }, [selectedFeature]);
+
+  const navigate = (name: string) => {
+    navigateToTab(name, {
+      currentTab: "Map",
+      isGuest,
+      onOpenLimitedAccess: () => setIsLimitedAccessOpen(true),
+      onSameTab: () => setSelectedFeature(undefined),
+    });
+  };
 
   useEffect(() => {
     let isMounted = true;
@@ -257,12 +328,14 @@ export default function MapScreen() {
               style={styles.closeButton}
               onPress={closeFeatureSheet}
             >
-              <Text style={styles.closeButtonText}>x</Text>
+              <CloseIcon width={28} height={28} accessible={false} />
             </Pressable>
 
-            <View style={styles.imagePlaceholder}>
-              <Text style={styles.imagePlaceholderText}>Image</Text>
-            </View>
+            <Image
+              source={getLocationImage(selectedFeature)}
+              style={styles.featureImage}
+              contentFit="cover"
+            />
 
             <Text style={styles.featureName}>{selectedFeature.name}</Text>
             {isMaintenanceAdminLocation(selectedFeature) ? (
@@ -335,11 +408,22 @@ export default function MapScreen() {
                   ? "View Floors and Rooms"
                   : "View Details"}
               </Text>
-              <Text style={styles.detailsButtonArrow}>→</Text>
+              <ProceedArrow width={16} height={19} accessible={false} />
             </Pressable>
           </View>
         </View>
       ) : null}
+
+      <OfficialBottomNavigation activeItem="Map" onSelect={navigate} />
+
+      <LimitedAccessModal
+        visible={isLimitedAccessOpen}
+        onClose={() => setIsLimitedAccessOpen(false)}
+        onLogin={() => {
+          setIsLimitedAccessOpen(false);
+          router.push("/login");
+        }}
+      />
     </View>
   );
 }
@@ -391,7 +475,7 @@ const styles = StyleSheet.create({
     width: "100%",
     maxWidth: 360,
     padding: 16,
-    borderRadius: 8,
+    borderRadius: 12,
     backgroundColor: "#ffffff",
     shadowColor: "#000",
     shadowOffset: {
@@ -406,8 +490,8 @@ const styles = StyleSheet.create({
 
   closeButton: {
     position: "absolute",
-    top: -18,
-    right: -4,
+    top: -16,
+    right: -2,
     zIndex: 2,
     alignItems: "center",
     justifyContent: "center",
@@ -415,39 +499,22 @@ const styles = StyleSheet.create({
     height: 38,
     borderRadius: 19,
     backgroundColor: "#ffffff",
-    borderColor: "#e5e7eb",
+    borderColor: "#E8DDDE",
     borderWidth: 1,
   },
 
-  closeButtonText: {
-    color: "#111827",
-    fontSize: 18,
-    fontWeight: "800",
-    lineHeight: 20,
-  },
-
-  imagePlaceholder: {
-    alignItems: "center",
-    justifyContent: "center",
+  featureImage: {
     height: 128,
     marginBottom: 14,
-    borderRadius: 8,
-    backgroundColor: "#f3f4f6",
-    borderColor: "#e5e7eb",
-    borderWidth: 1,
-  },
-
-  imagePlaceholderText: {
-    color: "#6b7280",
-    fontSize: 14,
-    fontWeight: "700",
+    borderRadius: 10,
+    width: "100%",
   },
 
   featureName: {
     marginBottom: 8,
-    color: "#111827",
+    color: "#3C4147",
+    fontFamily: "AfacadFluxBold",
     fontSize: 20,
-    fontWeight: "800",
   },
 
   categoryPill: {
@@ -455,17 +522,17 @@ const styles = StyleSheet.create({
     marginBottom: 14,
     paddingHorizontal: 10,
     paddingVertical: 5,
-    borderRadius: 8,
-    backgroundColor: "#f3f4f6",
-    borderColor: "#e5e7eb",
+    borderRadius: 999,
+    backgroundColor: "#FFF7E2",
+    borderColor: "#F0E2C0",
     borderWidth: 1,
   },
 
   maintenancePill: {
     alignSelf: "flex-start",
-    backgroundColor: "#f3f4f6",
-    borderColor: "#d1d5db",
-    borderRadius: 8,
+    backgroundColor: "#FAE7E9",
+    borderColor: "#E8DDDE",
+    borderRadius: 999,
     borderWidth: 1,
     marginBottom: 10,
     paddingHorizontal: 10,
@@ -473,15 +540,15 @@ const styles = StyleSheet.create({
   },
 
   maintenancePillText: {
-    color: "#374151",
+    color: "#AF2532",
+    fontFamily: "AfacadFluxBold",
     fontSize: 12,
-    fontWeight: "900",
   },
 
   categoryPillText: {
-    color: "#374151",
+    color: "#AF2532",
+    fontFamily: "AfacadFluxBold",
     fontSize: 12,
-    fontWeight: "800",
   },
 
   detailList: {
@@ -497,29 +564,31 @@ const styles = StyleSheet.create({
   },
 
   detailLabel: {
-    color: "#6b7280",
+    color: "#6C757D",
+    fontFamily: "AfacadFluxBold",
     fontSize: 12,
-    fontWeight: "700",
     textTransform: "uppercase",
   },
 
   detailValue: {
     flex: 1,
-    color: "#111827",
+    color: "#3C4147",
+    fontFamily: "AfacadFluxSemiBold",
     fontSize: 14,
-    fontWeight: "700",
     textAlign: "right",
   },
 
   description: {
-    color: "#374151",
+    color: "#4D535B",
+    fontFamily: "AfacadFluxRegular",
     fontSize: 14,
     lineHeight: 20,
   },
 
   directions: {
     marginTop: 10,
-    color: "#4b5563",
+    color: "#6C757D",
+    fontFamily: "AfacadFluxRegular",
     fontSize: 13,
     lineHeight: 19,
   },
@@ -529,8 +598,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "center",
     gap: 8,
-    backgroundColor: "#111827",
-    borderRadius: 8,
+    backgroundColor: "#AF2532",
+    borderRadius: 20,
     marginTop: 16,
     paddingHorizontal: 14,
     paddingVertical: 12,
@@ -538,13 +607,7 @@ const styles = StyleSheet.create({
 
   detailsButtonText: {
     color: "white",
+    fontFamily: "AfacadFluxBold",
     fontSize: 14,
-    fontWeight: "800",
-  },
-
-  detailsButtonArrow: {
-    color: "white",
-    fontSize: 16,
-    fontWeight: "800",
   },
 });

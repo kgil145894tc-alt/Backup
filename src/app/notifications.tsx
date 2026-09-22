@@ -1,31 +1,37 @@
-import { router } from "expo-router";
-import { useFocusEffect } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
+import { StatusBar } from "expo-status-bar";
 import { useCallback, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { FlatList, Pressable, Text, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 import {
-  NotificationDetailModal,
-  NotificationItem,
-} from "../../components/NotificationViews";
-import ProtectedAccess from "../../components/ProtectedAccess";
-import {
-  type CampusNotification,
-} from "../data/notifications";
+  OfficialNotificationCard,
+  OfficialNotificationDetailSheet,
+  type OfficialNotificationItem,
+} from "@/components/OfficialDesign";
+import Background from "../../assets/design/backgrounds/eightBg.svg";
+import CloseIcon from "../../assets/design/icons/close.svg";
+import ProtectedAccess from "@/components/ProtectedAccess";
+import { type CampusNotification } from "../data/notifications";
 import { loadNotifications } from "../services/notificationStore";
-import {
-  getReadNotificationIds,
-  markNotificationRead,
-} from "../utils/notificationReadState";
+import { getReadNotificationIds, markNotificationRead } from "../utils/notificationReadState";
+import { styles } from "../styles/official/notificationsScreen.styles";
+
+function toOfficialNotification(notification: CampusNotification): OfficialNotificationItem {
+  return {
+    id: notification.id,
+    title: notification.title,
+    message: notification.message,
+    time: notification.timeLabel,
+    buildingName: notification.locationName,
+    locationName: notification.locationSubtitle,
+  };
+}
 
 export default function NotificationsScreen() {
-  const [notifications, setNotifications] = useState<CampusNotification[]>(
-    [],
-  );
-  const [selectedNotification, setSelectedNotification] =
-    useState<CampusNotification>();
-  const [readNotificationIds, setReadNotificationIds] = useState<Set<string>>(
-    new Set(),
-  );
+  const [notifications, setNotifications] = useState<CampusNotification[]>([]);
+  const [selectedNotification, setSelectedNotification] = useState<CampusNotification>();
+  const [, setReadNotificationIds] = useState<Set<string>>(new Set());
 
   useFocusEffect(
     useCallback(() => {
@@ -46,79 +52,57 @@ export default function NotificationsScreen() {
     }, []),
   );
 
-  const openNotificationDetails = (notification: CampusNotification) => {
+  const openNotificationDetails = (item: OfficialNotificationItem) => {
+    const notification = notifications.find((candidate) => candidate.id === item.id);
+    if (!notification) return;
     setSelectedNotification(notification);
     void markNotificationRead(notification.id).then(setReadNotificationIds);
   };
 
+  const close = () => (router.canGoBack() ? router.back() : router.replace("/(tabs)"));
+
   return (
     <ProtectedAccess>
-      <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>All Notifications</Text>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Close notifications"
-          onPress={() => router.back()}
-        >
-          <Text style={styles.closeText}>x</Text>
-        </Pressable>
-      </View>
-
-      <ScrollView
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
-      >
-        {notifications.map((notification) => (
-          <NotificationItem
-            isRead={readNotificationIds.has(notification.id)}
-            key={notification.id}
-            notification={notification}
-            onPress={openNotificationDetails}
+      <View style={styles.screen}>
+        <StatusBar style="light" />
+        <View style={styles.background} pointerEvents="none">
+          <Background width="100%" height="100%" preserveAspectRatio="none" />
+        </View>
+        <SafeAreaView edges={["top", "left", "right"]} style={styles.headerSafe}>
+          <View style={styles.header}>
+            <Text accessibilityRole="header" style={styles.title}>
+              All Notifications
+            </Text>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Close all notifications"
+              onPress={close}
+              style={({ pressed }) => [styles.closeButton, pressed && styles.pressed]}
+            >
+              <CloseIcon width={30} height={30} accessible={false} />
+            </Pressable>
+          </View>
+        </SafeAreaView>
+        <SafeAreaView edges={["left", "right", "bottom"]} style={styles.body}>
+          <FlatList
+            data={notifications.map(toOfficialNotification)}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={styles.content}
+            showsVerticalScrollIndicator={false}
+            renderItem={({ item }) => (
+              <OfficialNotificationCard item={item} onPress={openNotificationDetails} />
+            )}
+            ItemSeparatorComponent={() => <View style={styles.separator} />}
+            ListEmptyComponent={<Text style={styles.empty}>No notifications yet.</Text>}
           />
-        ))}
-      </ScrollView>
-
-      <NotificationDetailModal
-        notification={selectedNotification}
-        onClose={() => setSelectedNotification(undefined)}
-      />
+        </SafeAreaView>
+        {selectedNotification ? (
+          <OfficialNotificationDetailSheet
+            item={toOfficialNotification(selectedNotification)}
+            onClosed={() => setSelectedNotification(undefined)}
+          />
+        ) : null}
       </View>
     </ProtectedAccess>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    backgroundColor: "#f8fafc",
-    flex: 1,
-  },
-
-  header: {
-    alignItems: "center",
-    backgroundColor: "#111827",
-    flexDirection: "row",
-    justifyContent: "space-between",
-    paddingBottom: 16,
-    paddingHorizontal: 18,
-    paddingTop: 64,
-  },
-
-  title: {
-    color: "white",
-    fontSize: 20,
-    fontWeight: "900",
-  },
-
-  closeText: {
-    color: "white",
-    fontSize: 22,
-    fontWeight: "900",
-  },
-
-  content: {
-    gap: 10,
-    padding: 14,
-    paddingBottom: 34,
-  },
-});

@@ -1,18 +1,18 @@
 import { useEffect, useMemo, useRef, type ElementRef } from "react";
 import { WebView } from "react-native-webview";
-import benchesData from "../src/data/benches.json";
-import buildingsData from "../src/data/buildings.json";
-import campusBoundary from "../src/data/campusBoundary";
-import locationsData from "../src/data/locations.json";
-import mapFeaturesData from "../src/data/mapFeatures.json";
+import benchesData from "@/data/benches.json";
+import buildingsData from "@/data/buildings.json";
+import campusBoundary from "@/data/campusBoundary";
+import locationsData from "@/data/locations.json";
+import mapFeaturesData from "@/data/mapFeatures.json";
 import type {
   CurrentMapLocation,
   SelectedMapFeature,
-} from "../src/types/campus";
+} from "@/types/campus";
 export type {
   CurrentMapLocation,
   SelectedMapFeature
-} from "../src/types/campus";
+} from "@/types/campus";
 
 type OSMMapProps = {
   selectedFeatureId?: string;
@@ -21,6 +21,7 @@ type OSMMapProps = {
   hiddenFeatureKeys?: string[];
   featureOverrides?: SelectedMapFeature[];
   openSelectedPopup?: boolean;
+  controlsTopOffset?: number;
   currentLocation?: CurrentMapLocation;
   onFeaturePress?: (feature: SelectedMapFeature) => void;
 };
@@ -32,6 +33,7 @@ export default function OSMMap({
   hiddenFeatureKeys = [],
   featureOverrides = [],
   openSelectedPopup = true,
+  controlsTopOffset = 12,
   currentLocation,
   onFeaturePress,
 }: OSMMapProps) {
@@ -90,6 +92,10 @@ export default function OSMMap({
 
           .leaflet-overlay-pane svg path {
             vector-effect: non-scaling-stroke;
+          }
+
+          .leaflet-top {
+            top: ${Math.max(12, controlsTopOffset)}px;
           }
 
           .campus-building-shape {
@@ -912,7 +918,7 @@ const benchCollection =
       </body>
     </html>
   `,
-    [boundaryCoordinates, featureOverrides, hiddenFeatureKeys, openSelectedPopup, selectedCategory, selectedFeatureId, selectedFeatureType],
+    [boundaryCoordinates, controlsTopOffset, featureOverrides, hiddenFeatureKeys, openSelectedPopup, selectedCategory, selectedFeatureId, selectedFeatureType],
   );
 
   return (

@@ -33,7 +33,7 @@ export default function LimitedAccessModal({
           </Pressable>
 
           <View style={styles.iconCircle}>
-            <Text style={styles.iconText}>L</Text>
+            <Text style={styles.iconText}>!</Text>
           </View>
 
           <Text style={styles.title}>Limited Access</Text>
@@ -60,7 +60,7 @@ const styles = StyleSheet.create({
   },
 
   backdrop: {
-    backgroundColor: "rgba(17, 24, 39, 0.58)",
+    backgroundColor: "rgba(0, 0, 0, 0.4)",
     bottom: 0,
     left: 0,
     position: "absolute",
@@ -70,8 +70,10 @@ const styles = StyleSheet.create({
 
   card: {
     alignItems: "center",
-    backgroundColor: "white",
-    borderRadius: 8,
+    backgroundColor: "rgba(255,255,255,0.98)",
+    borderColor: "#CDA6AA",
+    borderRadius: 15,
+    borderWidth: 1,
     elevation: 8,
     maxWidth: 340,
     paddingHorizontal: 22,
@@ -93,14 +95,14 @@ const styles = StyleSheet.create({
   },
 
   closeText: {
-    color: "#9ca3af",
+    color: "#AF2532",
+    fontFamily: "NotificationBold",
     fontSize: 22,
-    fontWeight: "900",
   },
 
   iconCircle: {
     alignItems: "center",
-    backgroundColor: "#f3f4f6",
+    backgroundColor: "#F7E5E3",
     borderRadius: 38,
     height: 76,
     justifyContent: "center",
@@ -109,38 +111,39 @@ const styles = StyleSheet.create({
   },
 
   iconText: {
-    color: "#111827",
+    color: "#AF2532",
+    fontFamily: "NotificationBold",
     fontSize: 30,
-    fontWeight: "900",
   },
 
   title: {
-    color: "#111827",
+    color: "#AF2532",
+    fontFamily: "NotificationBold",
     fontSize: 22,
-    fontWeight: "900",
     marginBottom: 10,
     textAlign: "center",
   },
 
   message: {
-    color: "#374151",
-    fontSize: 13,
-    lineHeight: 19,
+    color: "#6C757D",
+    fontFamily: "NotificationRegular",
+    fontSize: 15,
+    lineHeight: 21,
     marginBottom: 20,
     textAlign: "center",
   },
 
   loginButton: {
     alignItems: "center",
-    backgroundColor: "#111827",
-    borderRadius: 8,
+    backgroundColor: "#AF2532",
+    borderRadius: 40,
     paddingVertical: 13,
     width: "100%",
   },
 
   loginButtonText: {
     color: "white",
-    fontSize: 15,
-    fontWeight: "900",
+    fontFamily: "NotificationBold",
+    fontSize: 18,
   },
 });

@@ -1,22 +1,31 @@
-import { useCallback, useState } from "react";
+import { Image } from "expo-image";
 import { router, useFocusEffect } from "expo-router";
-import {
-  Modal,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { StatusBar } from "expo-status-bar";
+import { type ComponentProps, type ComponentType, useCallback, useRef, useState } from "react";
+import { Keyboard, Pressable, ScrollView, Text, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
-import LimitedAccessModal from "../../../components/LimitedAccessModal";
+import LimitedAccessModal from "@/components/LimitedAccessModal";
 import {
-  NotificationDetailModal,
-  NotificationItem,
-} from "../../../components/NotificationViews";
-import {
-  type CampusNotification,
-} from "../../data/notifications";
+  OfficialBottomNavigation,
+  OfficialNotificationDetailSheet,
+  OfficialNotificationSheet,
+  OfficialRecentLocations,
+  type OfficialNotificationItem,
+  type OfficialRecentItem,
+} from "@/components/OfficialDesign";
+import AcademicIcon from "../../../assets/design/icons/academic.svg";
+import Arrow from "../../../assets/design/icons/proceed-arrow.svg";
+import Background from "../../../assets/design/backgrounds/thirdBg.svg";
+import Bell from "../../../assets/design/icons/notification.svg";
+import CampusMap from "../../../assets/design/icons/campusMap.svg";
+import FacilitiesIcon from "../../../assets/design/icons/facilities.svg";
+import FoodIcon from "../../../assets/design/icons/food.svg";
+import MoreIcon from "../../../assets/design/icons/more.svg";
+import OfficesIcon from "../../../assets/design/icons/offices.svg";
+import Search from "../../../assets/design/icons/seacrch.svg";
+import ServicesIcon from "../../../assets/design/icons/services.svg";
+import { type CampusNotification } from "../../data/notifications";
 import { loadCampusData } from "../../services/campusDataStore";
 import { loadNotifications } from "../../services/notificationStore";
 import {
@@ -27,34 +36,39 @@ import {
   type StoredUserSession,
 } from "../../utils/appSession";
 import type { AdminLocation } from "../../utils/adminLocations";
-import {
-  getCurrentHistory,
-  type GuestHistoryItem,
-} from "../../utils/guestHistory";
-import {
-  getReadNotificationIds,
-  markNotificationRead,
-} from "../../utils/notificationReadState";
+import { getCurrentHistory, type GuestHistoryItem } from "../../utils/guestHistory";
+import { getReadNotificationIds, markNotificationRead } from "../../utils/notificationReadState";
+import { navigateToTab } from "@/utils/navigation";
+import { styles } from "../../styles/official/homeScreen.styles";
+
+const universitySeal = require("../../../assets/design/logos/UM.png");
 
 type CategoryShortcut = {
+  Icon: ComponentType<ComponentProps<typeof AcademicIcon>>;
+  light?: boolean;
+  style: "academic" | "offices" | "pink" | "cream";
   title: string;
-  icon: string;
 };
 
 const categoryShortcuts: CategoryShortcut[] = [
-  { title: "Academic", icon: "A" },
-  { title: "Offices", icon: "O" },
-  { title: "Facilities", icon: "F" },
-  { title: "Food", icon: "D" },
-  { title: "Services", icon: "S" },
+  { title: "Academic", Icon: AcademicIcon, style: "academic", light: true },
+  { title: "Offices", Icon: OfficesIcon, style: "offices" },
+  { title: "Facilities", Icon: FacilitiesIcon, style: "pink" },
+  { title: "Food", Icon: FoodIcon, style: "cream" },
+  { title: "Services", Icon: ServicesIcon, style: "pink" },
+  { title: "More", Icon: MoreIcon, style: "cream" },
 ];
 
-const classroomEssentials: CategoryShortcut[] = [
-  { title: "Main Entrance", icon: "E" },
-  { title: "Administration", icon: "A" },
-  { title: "Cafeteria", icon: "C" },
-  { title: "Security Office", icon: "S" },
-];
+const locationImages = {
+  academic: require("../../../assets/design/locations/category-academic.png"),
+  admin: require("../../../assets/design/locations/category-admin.png"),
+  cafeteria: require("../../../assets/design/locations/cafeteria.png"),
+  clinic: require("../../../assets/design/locations/clinic.png"),
+  default: require("../../../assets/design/locations/old-building.png"),
+  facilities: require("../../../assets/design/locations/category-facilities.png"),
+  library: require("../../../assets/design/locations/library.png"),
+  newBuilding: require("../../../assets/design/locations/new-building.png"),
+};
 
 function formatViewedAt(viewedAt: number) {
   const elapsedMs = Date.now() - viewedAt;
@@ -74,29 +88,47 @@ function formatViewedAt(viewedAt: number) {
   return `${elapsedDays} day${elapsedDays === 1 ? "" : "s"} ago`;
 }
 
+function getLocationImage(location?: AdminLocation, item?: GuestHistoryItem) {
+  const name = `${location?.name ?? item?.name ?? ""}`.toLowerCase();
+  const category = `${location?.category ?? item?.category ?? ""}`.toLowerCase();
+
+  if (name.includes("cafeteria")) return locationImages.cafeteria;
+  if (name.includes("clinic")) return locationImages.clinic;
+  if (name.includes("library")) return locationImages.library;
+  if (name.includes("new") || name.includes("building 2")) return locationImages.newBuilding;
+  if (category.includes("academic")) return locationImages.academic;
+  if (category.includes("office") || category.includes("admin")) return locationImages.admin;
+  if (category.includes("facilit")) return locationImages.facilities;
+  return locationImages.default;
+}
+
+function toOfficialNotification(notification: CampusNotification): OfficialNotificationItem {
+  return {
+    id: notification.id,
+    title: notification.title,
+    message: notification.message,
+    time: notification.timeLabel,
+    buildingName: notification.locationName,
+    locationName: notification.locationSubtitle,
+  };
+}
+
 export default function Home() {
+  const scrollRef = useRef<ScrollView>(null);
+  const openAllAfterClose = useRef(false);
+  const pendingNotification = useRef<CampusNotification | null>(null);
   const [recentItems, setRecentItems] = useState<GuestHistoryItem[]>([]);
-  const [adminLocations, setAdminLocations] = useState<AdminLocation[]>(
-    [],
-  );
+  const [adminLocations, setAdminLocations] = useState<AdminLocation[]>([]);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
-  const [selectedNotification, setSelectedNotification] =
-    useState<CampusNotification>();
-  const [notifications, setNotifications] = useState<CampusNotification[]>(
-    [],
-  );
-  const [readNotificationIds, setReadNotificationIds] = useState<Set<string>>(
-    new Set(),
-  );
+  const [selectedNotification, setSelectedNotification] = useState<CampusNotification>();
+  const [notifications, setNotifications] = useState<CampusNotification[]>([]);
+  const [readNotificationIds, setReadNotificationIds] = useState<Set<string>>(new Set());
   const [accessMode, setAccessMode] = useState<AppAccessMode>("guest");
-  const [userSession, setUserSession] =
-    useState<StoredUserSession | null>(null);
+  const [userSession, setUserSession] = useState<StoredUserSession | null>(null);
   const [isLimitedAccessOpen, setIsLimitedAccessOpen] = useState(false);
   const isGuest = isGuestMode(accessMode);
   const displayName =
-    userSession?.displayName?.split(" ")[0] ??
-    userSession?.email?.split("@")[0] ??
-    "User";
+    userSession?.displayName?.split(" ")[0] ?? userSession?.email?.split("@")[0] ?? "User";
 
   useFocusEffect(
     useCallback(() => {
@@ -109,39 +141,23 @@ export default function Home() {
         getStoredUserSession(),
         loadNotifications(),
         getReadNotificationIds(),
-      ]).then(
-        ([
-          history,
-          campusData,
-          mode,
-          session,
-          nextNotifications,
-          nextReadNotificationIds,
-        ]) => {
-        if (isActive) {
-          setAccessMode(mode);
-          setUserSession(session);
-          setNotifications(nextNotifications);
-          setReadNotificationIds(nextReadNotificationIds);
-          const visibleLocationKeys = new Set(
-            campusData.visibleLocations.map(
-              (location) => `${location.type}:${location.id}`,
-            ),
-          );
+      ]).then(([history, campusData, mode, session, nextNotifications, nextReadIds]) => {
+        if (!isActive) return;
+        setAccessMode(mode);
+        setUserSession(session);
+        setNotifications(nextNotifications);
+        setReadNotificationIds(nextReadIds);
 
-          setRecentItems(
-            history
-              .filter((item) =>
-                visibleLocationKeys.has(
-                  `${item.featureType}:${item.featureId}`,
-                ),
-              )
-              .slice(0, 3),
-          );
-          setAdminLocations(campusData.visibleLocations);
-        }
-        },
-      );
+        const visibleLocationKeys = new Set(
+          campusData.visibleLocations.map((location) => `${location.type}:${location.id}`),
+        );
+        setRecentItems(
+          history
+            .filter((item) => visibleLocationKeys.has(`${item.featureType}:${item.featureId}`))
+            .slice(0, 6),
+        );
+        setAdminLocations(campusData.visibleLocations);
+      });
 
       return () => {
         isActive = false;
@@ -149,9 +165,7 @@ export default function Home() {
     }, []),
   );
 
-  const openLimitedAccess = () => {
-    setIsLimitedAccessOpen(true);
-  };
+  const openLimitedAccess = () => setIsLimitedAccessOpen(true);
 
   const openLogin = () => {
     setIsLimitedAccessOpen(false);
@@ -163,7 +177,6 @@ export default function Home() {
       openLimitedAccess();
       return;
     }
-
     setIsNotificationsOpen(true);
   };
 
@@ -172,777 +185,217 @@ export default function Home() {
     void markNotificationRead(notification.id).then(setReadNotificationIds);
   };
 
+  const handleNotificationsClosed = useCallback(() => {
+    if (pendingNotification.current) {
+      openNotificationDetails(pendingNotification.current);
+      pendingNotification.current = null;
+      return;
+    }
+
+    if (openAllAfterClose.current) {
+      openAllAfterClose.current = false;
+      router.push("/notifications");
+    }
+  }, []);
+
   const openLockedRoute = (pathname: "/(tabs)/search" | "/(tabs)/categories") => {
     if (isGuest) {
       openLimitedAccess();
       return;
     }
-
-    router.push(pathname);
-  };
-
-  const openDetails = (item: GuestHistoryItem) => {
-    router.push({
-      pathname: "/(tabs)/location-details",
-      params: {
-        featureId: item.featureId,
-        featureType: item.featureType,
-      },
-    });
+    router.navigate(pathname);
   };
 
   const getRecentDisplayItem = (item: GuestHistoryItem) =>
     adminLocations.find(
-      (location) =>
-        location.id === item.featureId &&
-        location.type === item.featureType,
+      (location) => location.id === item.featureId && location.type === item.featureType,
     );
-  const unreadNotificationCount = isGuest
-    ? 0
-    : notifications.filter(
-        (notification) => !readNotificationIds.has(notification.id),
-      ).length;
+
+  const recentCards: OfficialRecentItem[] = recentItems.map((item) => ({
+    id: `${item.featureType}-${item.featureId}`,
+    image: getLocationImage(getRecentDisplayItem(item), item),
+    name: getRecentDisplayItem(item)?.name ?? item.name,
+    time: formatViewedAt(item.viewedAt),
+  }));
+
+  const openRecentItem = (item: OfficialRecentItem) => {
+    const historyItem = recentItems.find(
+      (recent) => `${recent.featureType}-${recent.featureId}` === item.id,
+    );
+
+    if (!historyItem) return;
+
+    router.push({
+      pathname: "/(tabs)/location-details",
+      params: {
+        featureId: historyItem.featureId,
+        featureType: historyItem.featureType,
+      },
+    });
+  };
+
+  const navigate = (name: string) => {
+    Keyboard.dismiss();
+    navigateToTab(name, {
+      currentTab: "Home",
+      isGuest,
+      onOpenLimitedAccess: openLimitedAccess,
+      onSameTab: () => scrollRef.current?.scrollTo({ y: 0, animated: true }),
+    });
+  };
 
   return (
-    <ScrollView
-      contentContainerStyle={styles.content}
-      style={styles.container}
-      showsVerticalScrollIndicator={false}
-    >
-      <View style={styles.header}>
-        <View style={styles.logoMark}>
-          <Text style={styles.logoText}>UM</Text>
-        </View>
-
-        <View style={styles.brandBlock}>
-          <Text style={styles.brand}>UMVC FIND</Text>
-          <Text style={styles.tagline}>Explore the campus now</Text>
-        </View>
-
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Open notifications"
-          style={styles.notificationButton}
-          onPress={openNotifications}
-        >
-          <Text style={styles.notificationText}>!</Text>
-          {unreadNotificationCount > 0 ? (
-            <View style={styles.notificationBadge}>
-              <Text style={styles.notificationBadgeText}>
-                {unreadNotificationCount > 9 ? "9+" : unreadNotificationCount}
-              </Text>
-            </View>
-          ) : null}
-        </Pressable>
+    <View style={styles.screen}>
+      <StatusBar hidden={false} style="light" />
+      <View style={styles.background} pointerEvents="none">
+        <Background width="100%" height="100%" preserveAspectRatio="none" />
       </View>
 
-      <View style={styles.main}>
-        <View style={styles.welcomeBlock}>
-          <Text style={styles.title}>
-            {isGuest
-              ? "Welcome Back, Guest!"
-              : `Welcome Back, ${displayName}!`}
-          </Text>
-        </View>
-
-        <Pressable
-          accessibilityRole="button"
-          style={styles.searchCard}
-          onPress={() => openLockedRoute("/(tabs)/search")}
-        >
-          <Text style={styles.searchIcon}>Q</Text>
-          <View style={styles.searchCopy}>
-            <Text style={styles.searchTitle}>Where do you want to go?</Text>
-            <Text style={styles.searchSubtitle}>
-              Search buildings, offices, rooms...
+      <SafeAreaView style={styles.safe} edges={["top", "left", "right"]}>
+        <View style={styles.header}>
+          <Image
+            source={universitySeal}
+            style={styles.seal}
+            contentFit="contain"
+            accessibilityLabel="University of Mindanao seal"
+          />
+          <View style={styles.brand}>
+            <Text style={styles.brandTitle} numberOfLines={1} adjustsFontSizeToFit>
+              UMVC
+              <Text style={styles.gold}>FIND</Text>
             </Text>
+            <Text style={styles.brandSubtitle}>Explore the campus now!</Text>
           </View>
-          <Text style={styles.chevron}>{">"}</Text>
-        </Pressable>
-
-        {isGuest ? (
           <Pressable
             accessibilityRole="button"
-            style={styles.mapCard}
-            onPress={() => router.push("/(tabs)/map")}
+            accessibilityLabel="Notifications"
+            style={styles.iconButton}
+            onPress={openNotifications}
           >
-            <View style={styles.mapIconBox}>
-              <Text style={styles.mapIcon}>M</Text>
-            </View>
-            <View style={styles.mapCopy}>
-              <Text style={styles.mapTitle}>Explore Campus Map</Text>
-              <Text style={styles.mapSubtitle}>
-                View the interactive map and find your destination
-              </Text>
-            </View>
-            <Text style={styles.mapArrow}>{">"}</Text>
+            <Bell width={28} height={28} accessible={false} />
           </Pressable>
-        ) : (
-          <>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Recently Viewed</Text>
-              <Pressable onPress={() => openLockedRoute("/(tabs)/search")}>
-                <Text style={styles.sectionAction}>See all</Text>
-              </Pressable>
-            </View>
+        </View>
 
-            {recentItems.length > 0 ? (
-              <ScrollView
-                contentContainerStyle={styles.recentList}
-                horizontal
-                showsHorizontalScrollIndicator={false}
-              >
-                {recentItems.map((item) => (
-                  <RecentCard
-                    key={`${item.featureType}-${item.featureId}`}
-                    item={item}
-                    location={getRecentDisplayItem(item)}
-                    onPress={() => openDetails(item)}
-                  />
-                ))}
-              </ScrollView>
-            ) : (
-              <View style={styles.emptyRecentCard}>
-                <Text style={styles.emptyRecentTitle}>No recent places yet</Text>
-                <Text style={styles.emptyRecentText}>
-                  Open a building or room to see it here.
-                </Text>
-              </View>
-            )}
-          </>
-        )}
-
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>
-            {isGuest ? "Browse by Category" : "Explore Campus"}
+        <ScrollView
+          ref={scrollRef}
+          contentContainerStyle={styles.content}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <Text style={styles.welcome} numberOfLines={1} adjustsFontSizeToFit>
+            {isGuest ? "Welcome Back, Guest!" : `Welcome Back, ${displayName}!`}
           </Text>
-          <Pressable onPress={() => openLockedRoute("/(tabs)/categories")}>
-            <Text style={styles.sectionAction}>
-              {isGuest ? "See all" : "Browse by category"}
-            </Text>
+          <Text style={styles.prompt}>Where do you want to go?</Text>
+
+          <Pressable
+            accessibilityRole="button"
+            style={styles.searchBox}
+            onPress={() => openLockedRoute("/(tabs)/search")}
+          >
+            <Search width={26} height={26} accessible={false} />
+            <Text style={styles.input}>Search a building or location...</Text>
           </Pressable>
-        </View>
 
-        <View style={styles.categoryGrid}>
-          {(isGuest ? categoryShortcuts.slice(0, 3) : categoryShortcuts).map(
-            (category) => (
+          <View style={styles.sectionHeading}>
+            <Text style={styles.sectionTitle}>Recently Viewed</Text>
+            {recentItems.length > 0 ? (
               <Pressable
-                key={category.title}
-                style={styles.categoryCard}
-                onPress={() => openLockedRoute("/(tabs)/categories")}
+                accessibilityRole="button"
+                style={styles.seeAll}
+                onPress={() => openLockedRoute("/(tabs)/search")}
               >
-                <Text style={styles.categoryIcon}>{category.icon}</Text>
-                <Text style={styles.categoryTitle}>{category.title}</Text>
-                <Text style={styles.categoryArrow}>{">"}</Text>
+                <Text style={styles.link}>See all</Text>
+                <Arrow width={14} height={16} color="#AF2532" accessible={false} />
               </Pressable>
-            ),
-          )}
-        </View>
+            ) : null}
+          </View>
 
-        {isGuest ? (
-          <View style={styles.guestEssentials}>
-            <Text style={styles.guestEssentialsTitle}>
-              Classroom Essentials
-            </Text>
-            <Text style={styles.guestEssentialsText}>
-              Quick access to commonly used campus locations
-            </Text>
-            <View style={styles.essentialsGrid}>
-              {classroomEssentials.map((item) => (
+          <OfficialRecentLocations items={recentCards} onSelect={openRecentItem} />
+
+          <View>
+            <View style={styles.sectionHeading}>
+              <Text style={styles.sectionTitle}>Explore Campus</Text>
+              <Text style={styles.browse}>Browse by category</Text>
+            </View>
+            <View style={styles.grid}>
+              {categoryShortcuts.map(({ title, Icon, style, light }) => (
                 <Pressable
-                  key={item.title}
-                  style={styles.essentialCard}
-                  onPress={openLimitedAccess}
+                  key={title}
+                  accessibilityRole="button"
+                  accessibilityLabel={title}
+                  onPress={() => openLockedRoute("/(tabs)/categories")}
+                  style={({ pressed }) => [
+                    styles.tile,
+                    styles[style],
+                    pressed && styles.pressed,
+                  ]}
                 >
-                  <Text style={styles.essentialIcon}>{item.icon}</Text>
-                  <Text style={styles.essentialTitle}>{item.title}</Text>
+                  <Icon width={30} height={30} accessible={false} />
+                  <Text
+                    style={[styles.tileText, light && styles.white]}
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                  >
+                    {title}
+                  </Text>
                 </Pressable>
               ))}
             </View>
           </View>
-        ) : null}
 
-        {!isGuest ? (
           <Pressable
             accessibilityRole="button"
-            style={styles.mapCard}
-            onPress={() => router.push("/(tabs)/map")}
+            accessibilityLabel="Explore Campus Map"
+            onPress={() => router.navigate("/(tabs)/map")}
+            style={({ pressed }) => [styles.mapButton, pressed && styles.pressed]}
           >
-            <View style={styles.mapIconBox}>
-              <Text style={styles.mapIcon}>M</Text>
-            </View>
+            <CampusMap width={43} height={43} accessible={false} />
             <View style={styles.mapCopy}>
               <Text style={styles.mapTitle}>Explore Campus Map</Text>
               <Text style={styles.mapSubtitle}>
-                View the interactive map and find your destination
+                View the interactive map and start exploring!
               </Text>
             </View>
-            <Text style={styles.mapArrow}>{">"}</Text>
+            <Arrow width={21} height={25} color="white" accessible={false} />
           </Pressable>
-        ) : null}
-      </View>
+        </ScrollView>
 
-      <Modal
-        animationType="slide"
-        transparent
+        <OfficialBottomNavigation activeItem="Home" onSelect={navigate} />
+      </SafeAreaView>
+
+      <OfficialNotificationSheet
         visible={isNotificationsOpen}
-        onRequestClose={() => setIsNotificationsOpen(false)}
-      >
-        <View style={styles.notificationOverlay}>
-          <Pressable
-            style={styles.notificationBackdrop}
-            onPress={() => setIsNotificationsOpen(false)}
-          />
-
-          <View style={styles.notificationSheet}>
-            <View style={styles.sheetHandle} />
-            <View style={styles.notificationHeader}>
-              <Text style={styles.notificationTitle}>Notifications</Text>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Close notifications"
-                onPress={() => setIsNotificationsOpen(false)}
-              >
-                <Text style={styles.notificationClose}>x</Text>
-              </Pressable>
-            </View>
-
-            <View style={styles.notificationList}>
-              {notifications.slice(0, 4).map((notification) => (
-                <NotificationItem
-                  isRead={readNotificationIds.has(notification.id)}
-                  key={notification.id}
-                  notification={notification}
-                  onPress={openNotificationDetails}
-                />
-              ))}
-            </View>
-
-            <Pressable
-              style={styles.viewAllButton}
-              onPress={() => {
-                setIsNotificationsOpen(false);
-                if (isGuest) {
-                  openLimitedAccess();
-                  return;
-                }
-
-                router.push("/notifications");
-              }}
-            >
-              <Text style={styles.viewAllButtonText}>
-                View all Notifications
-              </Text>
-            </Pressable>
-          </View>
-        </View>
-      </Modal>
-
-      <NotificationDetailModal
-        notification={selectedNotification}
-        onClose={() => setSelectedNotification(undefined)}
+        onClose={() => setIsNotificationsOpen(false)}
+        items={notifications.slice(0, 4).map(toOfficialNotification)}
+        onSelect={(item) => {
+          const notification = notifications.find((candidate) => candidate.id === item.id);
+          if (notification) {
+            pendingNotification.current = notification;
+          }
+          setIsNotificationsOpen(false);
+        }}
+        onClosed={handleNotificationsClosed}
+        onViewAll={() => {
+          openAllAfterClose.current = true;
+          setIsNotificationsOpen(false);
+        }}
       />
+
+      {selectedNotification ? (
+        <OfficialNotificationDetailSheet
+          item={toOfficialNotification(selectedNotification)}
+          onClosed={() => {
+            setSelectedNotification(undefined);
+            setIsNotificationsOpen(true);
+          }}
+        />
+      ) : null}
 
       <LimitedAccessModal
         visible={isLimitedAccessOpen}
         onClose={() => setIsLimitedAccessOpen(false)}
         onLogin={openLogin}
       />
-    </ScrollView>
+    </View>
   );
 }
-
-function RecentCard({
-  item,
-  location,
-  onPress,
-}: {
-  item: GuestHistoryItem;
-  location?: AdminLocation;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable style={styles.recentCard} onPress={onPress}>
-      <View style={styles.recentImagePlaceholder} />
-      <Text style={styles.recentTime}>
-        {formatViewedAt(item.viewedAt)}
-      </Text>
-      <Text numberOfLines={2} style={styles.recentName}>
-        {location?.name ?? item.name}
-      </Text>
-      <Text numberOfLines={1} style={styles.recentMeta}>
-        {location?.status === "Maintenance"
-          ? `${location.category} - Maintenance`
-          : location?.category ?? item.category}
-      </Text>
-    </Pressable>
-  );
-}
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#f8fafc",
-  },
-
-  content: {
-    paddingBottom: 36,
-  },
-
-  header: {
-    alignItems: "center",
-    backgroundColor: "#1f2937",
-    flexDirection: "row",
-    paddingBottom: 42,
-    paddingHorizontal: 20,
-    paddingTop: 34,
-  },
-
-  logoMark: {
-    alignItems: "center",
-    backgroundColor: "#f9fafb",
-    borderRadius: 8,
-    height: 64,
-    justifyContent: "center",
-    marginRight: 14,
-    width: 64,
-  },
-
-  logoText: {
-    color: "#111827",
-    fontSize: 19,
-    fontWeight: "900",
-  },
-
-  brandBlock: {
-    flex: 1,
-  },
-
-  brand: {
-    color: "white",
-    fontSize: 28,
-    fontWeight: "900",
-    letterSpacing: 0,
-  },
-
-  tagline: {
-    color: "#e5e7eb",
-    fontSize: 15,
-    fontWeight: "600",
-    marginTop: 4,
-  },
-
-  notificationButton: {
-    alignItems: "center",
-    backgroundColor: "#f9fafb",
-    borderRadius: 18,
-    height: 36,
-    justifyContent: "center",
-    position: "relative",
-    width: 36,
-  },
-
-  notificationText: {
-    color: "#111827",
-    fontSize: 17,
-    fontWeight: "900",
-  },
-
-  notificationBadge: {
-    alignItems: "center",
-    backgroundColor: "#111827",
-    borderColor: "#f9fafb",
-    borderRadius: 9,
-    borderWidth: 1,
-    minWidth: 18,
-    height: 18,
-    justifyContent: "center",
-    position: "absolute",
-    right: -4,
-    top: -4,
-  },
-
-  notificationBadgeText: {
-    color: "white",
-    fontSize: 10,
-    fontWeight: "900",
-    paddingHorizontal: 3,
-  },
-
-  notificationOverlay: {
-    flex: 1,
-    justifyContent: "flex-end",
-  },
-
-  notificationBackdrop: {
-    backgroundColor: "rgba(17, 24, 39, 0.48)",
-    bottom: 0,
-    left: 0,
-    position: "absolute",
-    right: 0,
-    top: 0,
-  },
-
-  notificationSheet: {
-    backgroundColor: "#f9fafb",
-    borderTopLeftRadius: 8,
-    borderTopRightRadius: 8,
-    maxHeight: "78%",
-    paddingBottom: 20,
-  },
-
-  sheetHandle: {
-    alignSelf: "center",
-    backgroundColor: "#d1d5db",
-    borderRadius: 2,
-    height: 4,
-    marginTop: 10,
-    width: 54,
-  },
-
-  notificationHeader: {
-    alignItems: "center",
-    backgroundColor: "#111827",
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginTop: 10,
-    paddingHorizontal: 18,
-    paddingBottom: 14,
-    paddingTop: 22,
-  },
-
-  notificationTitle: {
-    color: "white",
-    fontSize: 18,
-    fontWeight: "900",
-  },
-
-  notificationClose: {
-    color: "white",
-    fontSize: 20,
-    fontWeight: "900",
-  },
-
-  notificationList: {
-    gap: 10,
-    padding: 14,
-  },
-
-  viewAllButton: {
-    alignItems: "center",
-    alignSelf: "center",
-    backgroundColor: "#111827",
-    borderRadius: 8,
-    marginTop: 2,
-    paddingHorizontal: 24,
-    paddingVertical: 13,
-    width: "84%",
-  },
-
-  viewAllButtonText: {
-    color: "white",
-    fontSize: 15,
-    fontWeight: "900",
-  },
-
-  main: {
-    marginTop: -18,
-    paddingHorizontal: 18,
-  },
-
-  welcomeBlock: {
-    backgroundColor: "#f8fafc",
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    paddingBottom: 14,
-    paddingTop: 28,
-  },
-
-  title: {
-    color: "#111827",
-    fontSize: 30,
-    fontWeight: "900",
-    lineHeight: 36,
-  },
-
-  searchCard: {
-    alignItems: "center",
-    backgroundColor: "white",
-    borderColor: "#e5e7eb",
-    borderRadius: 8,
-    borderWidth: 1,
-    flexDirection: "row",
-    minHeight: 78,
-    paddingHorizontal: 18,
-    shadowColor: "#111827",
-    shadowOffset: { height: 6, width: 0 },
-    shadowOpacity: 0.08,
-    shadowRadius: 14,
-    elevation: 2,
-  },
-
-  searchIcon: {
-    color: "#374151",
-    fontSize: 36,
-    fontWeight: "900",
-    marginRight: 16,
-  },
-
-  searchCopy: {
-    flex: 1,
-  },
-
-  searchTitle: {
-    color: "#374151",
-    fontSize: 19,
-    fontWeight: "800",
-  },
-
-  searchSubtitle: {
-    color: "#6b7280",
-    fontSize: 14,
-    fontWeight: "600",
-    marginTop: 4,
-  },
-
-  chevron: {
-    color: "#6b7280",
-    fontSize: 34,
-    fontWeight: "800",
-    marginLeft: 12,
-  },
-
-  sectionHeader: {
-    alignItems: "flex-end",
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginTop: 28,
-  },
-
-  sectionTitle: {
-    color: "#111827",
-    flex: 1,
-    fontSize: 25,
-    fontWeight: "900",
-    lineHeight: 31,
-  },
-
-  sectionAction: {
-    color: "#4b5563",
-    fontSize: 14,
-    fontWeight: "800",
-    marginLeft: 12,
-  },
-
-  recentList: {
-    gap: 12,
-    paddingRight: 18,
-    paddingTop: 14,
-  },
-
-  recentCard: {
-    backgroundColor: "white",
-    borderColor: "#e5e7eb",
-    borderRadius: 8,
-    borderWidth: 1,
-    minHeight: 176,
-    overflow: "hidden",
-    width: 150,
-  },
-
-  recentImagePlaceholder: {
-    backgroundColor: "#d1d5db",
-    height: 74,
-  },
-
-  recentTime: {
-    color: "#6b7280",
-    fontSize: 12,
-    fontWeight: "700",
-    marginHorizontal: 12,
-    marginTop: 12,
-  },
-
-  recentName: {
-    color: "#111827",
-    fontSize: 17,
-    fontWeight: "900",
-    lineHeight: 22,
-    marginHorizontal: 12,
-    marginTop: 8,
-  },
-
-  recentMeta: {
-    color: "#6b7280",
-    fontSize: 12,
-    fontWeight: "700",
-    marginHorizontal: 12,
-    marginTop: 6,
-  },
-
-  emptyRecentCard: {
-    backgroundColor: "white",
-    borderColor: "#e5e7eb",
-    borderRadius: 8,
-    borderWidth: 1,
-    marginTop: 14,
-    padding: 18,
-  },
-
-  emptyRecentTitle: {
-    color: "#111827",
-    fontSize: 17,
-    fontWeight: "900",
-  },
-
-  emptyRecentText: {
-    color: "#6b7280",
-    fontSize: 14,
-    fontWeight: "600",
-    marginTop: 6,
-  },
-
-  categoryGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 12,
-    marginTop: 14,
-  },
-
-  categoryCard: {
-    alignItems: "center",
-    backgroundColor: "white",
-    borderColor: "#e5e7eb",
-    borderRadius: 8,
-    borderWidth: 1,
-    flexBasis: "47%",
-    flexDirection: "row",
-    flexGrow: 1,
-    minHeight: 72,
-    minWidth: 138,
-    paddingHorizontal: 14,
-  },
-
-  categoryIcon: {
-    color: "#374151",
-    fontSize: 24,
-    fontWeight: "900",
-    marginRight: 12,
-    width: 24,
-  },
-
-  categoryTitle: {
-    color: "#111827",
-    flex: 1,
-    fontSize: 16,
-    fontWeight: "900",
-  },
-
-  categoryArrow: {
-    color: "#6b7280",
-    fontSize: 26,
-    fontWeight: "900",
-  },
-
-  guestEssentials: {
-    marginTop: 24,
-  },
-
-  guestEssentialsTitle: {
-    color: "#111827",
-    fontSize: 18,
-    fontWeight: "900",
-  },
-
-  guestEssentialsText: {
-    color: "#6b7280",
-    fontSize: 13,
-    fontWeight: "600",
-    marginTop: 3,
-  },
-
-  essentialsGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 10,
-    marginTop: 12,
-  },
-
-  essentialCard: {
-    alignItems: "center",
-    backgroundColor: "white",
-    borderColor: "#e5e7eb",
-    borderRadius: 8,
-    borderWidth: 1,
-    flexBasis: "47%",
-    flexGrow: 1,
-    minHeight: 76,
-    minWidth: 120,
-    padding: 12,
-  },
-
-  essentialIcon: {
-    color: "#374151",
-    fontSize: 20,
-    fontWeight: "900",
-    marginBottom: 8,
-  },
-
-  essentialTitle: {
-    color: "#111827",
-    fontSize: 12,
-    fontWeight: "800",
-    textAlign: "center",
-  },
-
-  mapCard: {
-    alignItems: "center",
-    backgroundColor: "#1f2937",
-    borderRadius: 8,
-    flexDirection: "row",
-    marginTop: 26,
-    minHeight: 104,
-    padding: 18,
-  },
-
-  mapIconBox: {
-    alignItems: "center",
-    backgroundColor: "#f9fafb",
-    borderRadius: 8,
-    height: 56,
-    justifyContent: "center",
-    marginRight: 16,
-    width: 56,
-  },
-
-  mapIcon: {
-    color: "#111827",
-    fontSize: 28,
-    fontWeight: "900",
-  },
-
-  mapCopy: {
-    flex: 1,
-  },
-
-  mapTitle: {
-    color: "white",
-    fontSize: 20,
-    fontWeight: "900",
-  },
-
-  mapSubtitle: {
-    color: "#e5e7eb",
-    fontSize: 14,
-    fontWeight: "600",
-    lineHeight: 20,
-    marginTop: 5,
-  },
-
-  mapArrow: {
-    color: "white",
-    fontSize: 36,
-    fontWeight: "900",
-    marginLeft: 12,
-  },
-});

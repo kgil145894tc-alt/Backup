@@ -1,15 +1,20 @@
+import { Image } from "expo-image";
 import { router } from "expo-router";
+import { StatusBar } from "expo-status-bar";
 import { useState } from "react";
 import {
+  ActivityIndicator,
   Platform,
   Pressable,
-  StyleSheet,
+  ScrollView,
   Text,
   TextInput,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 
+import LoginBackground from "../../assets/design/backgrounds/secondBg.svg";
+import GoogleIcon from "../../assets/design/logos/google.svg";
+import GuestIcon from "../../assets/design/icons/user.svg";
 import {
   canUseFirebaseUserAuth,
   registerUserWithEmailPassword,
@@ -22,6 +27,9 @@ import {
   setAppAccessMode,
   setStoredUserSession,
 } from "../utils/appSession";
+import { styles } from "../styles/official/loginScreen.styles";
+
+const logo = require("../../assets/design/logos/UMVC-Find.png");
 
 const googleClientIds = {
   androidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID,
@@ -36,11 +44,16 @@ async function getAndroidGoogleSignIn() {
     return null;
   }
 
-  const googleSignInModule = await import(
-    "@react-native-google-signin/google-signin"
-  );
+  try {
+    const googleSignInModule = await import(
+      "@react-native-google-signin/google-signin"
+    );
 
-  return googleSignInModule.GoogleSignin;
+    return googleSignInModule.GoogleSignin;
+  } catch (error) {
+    console.warn("Google Sign-In native module is not available", error);
+    return null;
+  }
 }
 
 async function configureNativeGoogleSignIn() {
@@ -136,7 +149,9 @@ export default function LoginScreen() {
       const GoogleSignin = await configureNativeGoogleSignIn();
 
       if (!GoogleSignin) {
-        setLoginError("Google login is only available in the Android development build.");
+        setLoginError(
+          "Google login needs a freshly rebuilt Android development build. Reinstall the app with npx expo run:android, then open that installed app instead of Expo Go.",
+        );
         setIsGoogleLoading(false);
         return;
       }
@@ -206,14 +221,56 @@ export default function LoginScreen() {
 
   const isIosEmailLogin = Platform.OS === "ios";
 
+
+
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.card}>
-        <Text style={styles.title}>Welcome to UMVC FIND</Text>
+    <View style={styles.screen}>
+      <StatusBar hidden />
+
+      <View style={styles.background} pointerEvents="none" accessible={false}>
+        <LoginBackground
+          width="100%"
+          height="100%"
+          preserveAspectRatio="none"
+          accessible={false}
+        />
+      </View>
+
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        <Image
+          source={logo}
+          contentFit="contain"
+          accessibilityLabel="UM Tagum College map pin logo"
+          style={styles.logo}
+        />
+
+        <Text
+          style={styles.title}
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          accessibilityRole="header"
+        >
+          UMVC
+          <Text style={styles.gold}>FIND</Text>
+        </Text>
+
         <Text style={styles.subtitle}>
+          Campus Navigator and Room Locator
+        </Text>
+
+        <Text style={styles.welcome} numberOfLines={1} adjustsFontSizeToFit>
+          Welcome to UM Visayan Campus!
+        </Text>
+
+        <Text style={styles.instructions}>
           {isIosEmailLogin
-            ? "Sign in with your umindanao.edu.ph account, or continue as a guest for now."
-            : "Sign in with your umindanao.edu.ph Google account, or continue as a guest for now."}
+            ? "Use your UMindanao email and password to login."
+            : "Use your University of Mindanao google account to login."}
         </Text>
 
         {isIosEmailLogin ? (
@@ -322,12 +379,13 @@ export default function LoginScreen() {
             <Pressable
               disabled={isEmailLoading}
               style={[
-                styles.primaryButton,
+                styles.button,
+                styles.guestButton,
                 isEmailLoading && styles.primaryButtonDisabled,
               ]}
               onPress={handleEmailPasswordLogin}
             >
-              <Text style={styles.primaryButtonText}>
+              <Text style={[styles.buttonText, styles.guestText]}>
                 {isEmailLoading
                   ? "Please wait..."
                   : isCreatingAccount
@@ -340,12 +398,19 @@ export default function LoginScreen() {
           <Pressable
             disabled={isGoogleLoading}
             style={[
-              styles.primaryButton,
+              styles.button,
+              styles.googleButton,
               isGoogleLoading && styles.primaryButtonDisabled,
             ]}
             onPress={handleGoogleLogin}
           >
-            <Text style={styles.primaryButtonText}>
+            <GoogleIcon
+              width={35}
+              height={35}
+              style={styles.googleIcon}
+              accessible={false}
+            />
+            <Text style={[styles.buttonText, styles.googleText]}>
               {isGoogleLoading ? "Signing in..." : "Continue with Google"}
             </Text>
           </Pressable>
@@ -356,7 +421,7 @@ export default function LoginScreen() {
         ) : null}
 
         <Pressable
-          style={styles.secondaryButton}
+          style={[styles.button, styles.guestButton]}
           onPress={() => {
             void clearStoredUserSession().then(() =>
               setAppAccessMode("guest"),
@@ -365,10 +430,13 @@ export default function LoginScreen() {
             });
           }}
         >
-          <Text style={styles.secondaryButtonText}>Continue as Guest</Text>
+          <GuestIcon width={21} height={23} accessible={false} />
+          <Text style={[styles.buttonText, styles.guestText]}>
+            Continue as Guest
+          </Text>
         </Pressable>
-      </View>
-    </SafeAreaView>
+      </ScrollView>
+    </View>
   );
 }
 
@@ -453,176 +521,3 @@ function getEmailPasswordErrorMessage(error: unknown) {
     ? `Email login failed: ${code}`
     : "Email login failed. Please try again.";
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 24,
-    backgroundColor: "#f8f7f2",
-  },
-
-  card: {
-    width: "100%",
-    maxWidth: 420,
-    padding: 22,
-    borderRadius: 8,
-    backgroundColor: "white",
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 6,
-    },
-    shadowOpacity: 0.12,
-    shadowRadius: 14,
-    elevation: 5,
-  },
-
-  title: {
-    color: "#a80f28",
-    fontSize: 26,
-    fontWeight: "900",
-    textAlign: "center",
-  },
-
-  subtitle: {
-    marginTop: 10,
-    marginBottom: 24,
-    color: "#4b5563",
-    fontSize: 15,
-    lineHeight: 21,
-    textAlign: "center",
-  },
-
-  primaryButton: {
-    alignItems: "center",
-    justifyContent: "center",
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: "#bb2338",
-  },
-
-  primaryButtonDisabled: {
-    opacity: 0.68,
-  },
-
-  primaryButtonText: {
-    color: "white",
-    fontSize: 16,
-    fontWeight: "800",
-  },
-
-  modeToggle: {
-    flexDirection: "row",
-    gap: 8,
-    marginBottom: 14,
-    padding: 4,
-    borderRadius: 8,
-    backgroundColor: "#f3f4f6",
-  },
-
-  modeButton: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    minHeight: 42,
-    borderRadius: 6,
-  },
-
-  modeButtonActive: {
-    backgroundColor: "white",
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
-    elevation: 2,
-  },
-
-  modeButtonText: {
-    color: "#6b7280",
-    fontSize: 14,
-    fontWeight: "800",
-  },
-
-  modeButtonTextActive: {
-    color: "#a80f28",
-  },
-
-  input: {
-    height: 48,
-    marginBottom: 12,
-    paddingHorizontal: 14,
-    borderWidth: 1,
-    borderColor: "#e5e7eb",
-    borderRadius: 8,
-    color: "#111827",
-    fontSize: 15,
-    backgroundColor: "#fffafa",
-  },
-
-  privacyRow: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 10,
-    marginBottom: 14,
-  },
-
-  checkbox: {
-    alignItems: "center",
-    justifyContent: "center",
-    width: 22,
-    height: 22,
-    marginTop: 1,
-    borderWidth: 1,
-    borderColor: "#bb2338",
-    borderRadius: 4,
-    backgroundColor: "white",
-  },
-
-  checkboxChecked: {
-    backgroundColor: "#bb2338",
-  },
-
-  checkboxText: {
-    color: "white",
-    fontSize: 13,
-    fontWeight: "900",
-  },
-
-  privacyText: {
-    flex: 1,
-    color: "#4b5563",
-    fontSize: 12,
-    lineHeight: 17,
-  },
-
-  loginError: {
-    color: "#991b1b",
-    fontSize: 13,
-    fontWeight: "700",
-    lineHeight: 18,
-    marginTop: 10,
-    textAlign: "center",
-  },
-
-  secondaryButton: {
-    alignItems: "center",
-    justifyContent: "center",
-    height: 50,
-    marginTop: 12,
-    borderWidth: 1,
-    borderColor: "#bb2338",
-    borderRadius: 25,
-    backgroundColor: "white",
-  },
-
-  secondaryButtonText: {
-    color: "#bb2338",
-    fontSize: 16,
-    fontWeight: "800",
-  },
-});

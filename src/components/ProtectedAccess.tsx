@@ -6,7 +6,7 @@ import {
   getAppAccessMode,
   isGuestMode,
   type AppAccessMode,
-} from "../src/utils/appSession";
+} from "@/utils/appSession";
 import LimitedAccessModal from "./LimitedAccessModal";
 
 type ProtectedAccessProps = {

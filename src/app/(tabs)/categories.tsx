@@ -1,37 +1,89 @@
 import { router, useFocusEffect } from "expo-router";
-import { useCallback, useMemo, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { StatusBar } from "expo-status-bar";
+import { useCallback, useMemo, useRef, useState } from "react";
+import { FlatList, Pressable, Text, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
-import ProtectedAccess from "../../../components/ProtectedAccess";
+import {
+  OfficialBottomNavigation,
+  OfficialCategoryCard,
+  type OfficialCategoryItem,
+} from "@/components/OfficialDesign";
+import Academic from "../../../assets/design/icons/academic.svg";
+import Admin from "../../../assets/design/icons/admin-office.svg";
+import Background from "../../../assets/design/backgrounds/fifthBg.svg";
+import BackArrow from "../../../assets/design/icons/back-arrow.svg";
+import Facilities from "../../../assets/design/icons/facilities-cog.svg";
+import OtherBuildings from "../../../assets/design/icons/other-building.svg";
+import ProtectedAccess from "@/components/ProtectedAccess";
 import { loadCampusData } from "../../services/campusDataStore";
 import type { CampusFeatureCategory } from "../../types/campus";
-import {
-  initialAdminLocations,
-  type AdminLocation,
-} from "../../utils/adminLocations";
+import { initialAdminLocations, type AdminLocation } from "../../utils/adminLocations";
+import { navigateToTab } from "@/utils/navigation";
+import { styles } from "../../styles/official/categoriesScreen.styles";
 
-const categoryOrder: CampusFeatureCategory[] = [
-  "Building",
-  "Room",
-  "Office",
-  "Laboratory",
-  "Facility",
-  "Faculty",
-  "Food",
+type CategoryCardConfig = OfficialCategoryItem & {
+  mapCategory?: CampusFeatureCategory;
+};
+
+const categoryImages = {
+  academic: require("../../../assets/design/locations/category-academic.png"),
+  admin: require("../../../assets/design/locations/category-admin.png"),
+  facilities: require("../../../assets/design/locations/category-facilities.png"),
+  other: require("../../../assets/design/locations/category-other.png"),
+};
+
+const categoryCards: CategoryCardConfig[] = [
+  {
+    id: "academic",
+    name: "Academic",
+    color: "#AF2532",
+    image: categoryImages.academic,
+    count: 0,
+    mapCategory: "Room",
+  },
+  {
+    id: "admin",
+    name: "Admin",
+    color: "#FEBF1F",
+    image: categoryImages.admin,
+    count: 0,
+    mapCategory: "Office",
+  },
+  {
+    id: "facilities",
+    name: "Facilities",
+    color: "#1EAB58",
+    image: categoryImages.facilities,
+    count: 0,
+    mapCategory: "Facility",
+  },
+  {
+    id: "other",
+    name: "Other Buildings",
+    color: "#FA5D0E",
+    image: categoryImages.other,
+    count: 0,
+  },
 ];
 
+const icons = {
+  academic: Academic,
+  admin: Admin,
+  facilities: Facilities,
+  other: OtherBuildings,
+};
+
 export default function Categories() {
-  const [mapFeatures, setMapFeatures] =
-    useState<AdminLocation[]>(initialAdminLocations);
+  const listRef = useRef<FlatList<CategoryCardConfig>>(null);
+  const [mapFeatures, setMapFeatures] = useState<AdminLocation[]>(initialAdminLocations);
 
   useFocusEffect(
     useCallback(() => {
       let isActive = true;
 
       void loadCampusData().then((snapshot) => {
-        if (isActive) {
-          setMapFeatures(snapshot.visibleLocations);
-        }
+        if (isActive) setMapFeatures(snapshot.visibleLocations);
       });
 
       return () => {
@@ -40,136 +92,84 @@ export default function Categories() {
     }, []),
   );
 
-  const categories = useMemo(
-    () =>
-      Array.from(
-        new Set(mapFeatures.map((feature) => feature.category)),
-      ).sort((a, b) => {
-        const aIndex = categoryOrder.indexOf(a);
-        const bIndex = categoryOrder.indexOf(b);
-
-        if (aIndex === -1 && bIndex === -1) {
-          return a.localeCompare(b);
-        }
-
-        if (aIndex === -1) {
-          return 1;
-        }
-
-        if (bIndex === -1) {
-          return -1;
-        }
-
-        return aIndex - bIndex;
-      }),
-    [mapFeatures],
-  );
-
-  function openCategoryOnMap(category: CampusFeatureCategory) {
-    router.push({
-      pathname: "/(tabs)/map",
-      params: {
-        category,
-      },
+  const categoryCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    mapFeatures.forEach((feature) => {
+      counts.set(feature.category, (counts.get(feature.category) ?? 0) + 1);
     });
-  }
+    return counts;
+  }, [mapFeatures]);
+
+  const categories = categoryCards.map((card) => {
+    if (!card.mapCategory) {
+      const known = new Set(categoryCards.map((item) => item.mapCategory).filter(Boolean));
+      return {
+        ...card,
+        count: mapFeatures.filter((feature) => !known.has(feature.category)).length,
+      };
+    }
+
+    return { ...card, count: categoryCounts.get(card.mapCategory) ?? 0 };
+  });
+
+  const openCategoryOnMap = (card: CategoryCardConfig) => {
+    if (!card.mapCategory) {
+      router.navigate("/(tabs)/map");
+      return;
+    }
+
+    router.navigate({
+      pathname: "/(tabs)/map",
+      params: { category: card.mapCategory },
+    });
+  };
+
+  const navigate = (name: string) => {
+    navigateToTab(name, {
+      currentTab: "Categories",
+      onSameTab: () => listRef.current?.scrollToOffset({ offset: 0, animated: true }),
+    });
+  };
 
   return (
     <ProtectedAccess>
-      <ScrollView
-        contentContainerStyle={styles.content}
-        style={styles.container}
-        showsVerticalScrollIndicator={false}
-      >
-      <Text style={styles.heading}>Categories</Text>
-      <Text style={styles.subheading}>
-        Choose a campus type to show its locations on the map.
-      </Text>
-
-      <View style={styles.categoryGrid}>
-        {categories.map((category) => {
-          const count = mapFeatures.filter(
-            (feature) => feature.category === category,
-          ).length;
-
-          return (
+      <View style={styles.screen}>
+        <StatusBar style="light" />
+        <View style={styles.background} pointerEvents="none">
+          <Background width="100%" height="100%" preserveAspectRatio="none" />
+        </View>
+        <SafeAreaView style={styles.safe} edges={["top", "left", "right"]}>
+          <View style={styles.header}>
             <Pressable
-              key={category}
               accessibilityRole="button"
-              accessibilityLabel={`Show ${category} locations on the map`}
-              style={styles.categoryCard}
-              onPress={() => openCategoryOnMap(category)}
+              accessibilityLabel="Go back"
+              onPress={() => (router.canGoBack() ? router.back() : router.replace("/(tabs)"))}
+              style={styles.backButton}
             >
-              <Text style={styles.categoryName}>{category}</Text>
-              <Text style={styles.categoryCount}>
-                {count} {count === 1 ? "place" : "places"}
-              </Text>
-              <Text style={styles.categoryAction}>View on map</Text>
+              <BackArrow width={32} height={32} accessible={false} />
             </Pressable>
-          );
-        })}
+            <Text style={styles.title}>Categories</Text>
+          </View>
+          <FlatList
+            ref={listRef}
+            style={styles.list}
+            contentContainerStyle={styles.content}
+            columnWrapperStyle={styles.row}
+            data={categories}
+            numColumns={2}
+            keyExtractor={(item) => item.id}
+            showsVerticalScrollIndicator={false}
+            renderItem={({ item }) => (
+              <OfficialCategoryCard
+                item={item}
+                Icon={icons[item.id as keyof typeof icons]}
+                onPress={() => openCategoryOnMap(item)}
+              />
+            )}
+          />
+          <OfficialBottomNavigation activeItem="Categories" onSelect={navigate} />
+        </SafeAreaView>
       </View>
-      </ScrollView>
     </ProtectedAccess>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-
-  content: {
-    padding: 20,
-    paddingBottom: 32,
-  },
-
-  heading: {
-    fontSize: 24,
-    fontWeight: "bold",
-    marginBottom: 8,
-  },
-
-  subheading: {
-    color: "#555",
-    fontSize: 14,
-    lineHeight: 20,
-    marginBottom: 18,
-  },
-
-  categoryGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 10,
-    marginBottom: 24,
-  },
-
-  categoryCard: {
-    backgroundColor: "#ffffff",
-    borderColor: "#e5e7eb",
-    borderRadius: 8,
-    borderWidth: 1,
-    minHeight: 104,
-    justifyContent: "space-between",
-    padding: 14,
-    width: "47%",
-  },
-
-  categoryName: {
-    fontSize: 16,
-    fontWeight: "bold",
-    marginBottom: 6,
-  },
-
-  categoryCount: {
-    color: "#555",
-    fontSize: 13,
-  },
-
-  categoryAction: {
-    color: "#8F1D32",
-    fontSize: 12,
-    fontWeight: "800",
-    marginTop: 12,
-  },
-});

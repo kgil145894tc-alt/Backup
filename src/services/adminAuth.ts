@@ -12,12 +12,9 @@ import {
 } from "./firebase";
 import { getUserRole } from "./firestoreData";
 
-export const PROTOTYPE_ADMIN_EMAIL = "admin@umvcfind.local";
-export const PROTOTYPE_ADMIN_PASSWORD = "admin123";
-
 export type AdminSession = {
   email: string;
-  source: "firebase" | "prototype";
+  source: "firebase";
   uid?: string;
 };
 
@@ -30,13 +27,6 @@ export type AdminLoginResult =
       ok: false;
       message: string;
     };
-
-function isPrototypeAdminCredentials(email: string, password: string) {
-  return (
-    email.trim().toLowerCase() === PROTOTYPE_ADMIN_EMAIL &&
-    password === PROTOTYPE_ADMIN_PASSWORD
-  );
-}
 
 async function hasAdminRole(user: User) {
   if (!firestoreDb) {
@@ -53,20 +43,10 @@ export async function loginAdmin(
   const normalizedEmail = email.trim().toLowerCase();
 
   if (!isFirebaseConfigured || !firebaseAuth || !firestoreDb) {
-    if (isPrototypeAdminCredentials(normalizedEmail, password)) {
-      return {
-        ok: true,
-        session: {
-          email: PROTOTYPE_ADMIN_EMAIL,
-          source: "prototype",
-        },
-      };
-    }
-
     return {
       ok: false,
       message:
-        "Invalid prototype admin login. Firebase is not configured yet.",
+        "Firebase is not configured. Admin access requires Firebase Authentication.",
     };
   }
 
