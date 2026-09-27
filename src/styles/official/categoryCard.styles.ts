@@ -1,14 +1,15 @@
 // Used by src/components/CategoryCard.jsx
 import { StyleSheet } from "react-native";
+import { rf, rs } from "@/utils/responsive";
 
 export const styles = StyleSheet.create({
   // Card Size, Rounded Corners, and Shadow
   card: {
     flex: 1,
     minWidth: 0,
-    minHeight: 100,
-    borderRadius: 25,
-    padding: 5,
+    minHeight: rs(188, 156, 198),
+    borderRadius: rs(16, 12, 18),
+    padding: rs(6, 5, 8),
     elevation: 3,
     shadowColor: "#000",
     shadowOpacity: 0.25,
@@ -20,16 +21,19 @@ export const styles = StyleSheet.create({
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    paddingTop: 16,
-    paddingBottom: 14,
-    gap: 5,
+    minHeight: rs(84, 72, 90),
+    paddingTop: rs(12, 8, 14),
+    paddingBottom: rs(10, 8, 12),
+    paddingHorizontal: 4,
+    gap: rs(5, 3, 6),
   },
   // Category Name
   name: {
-    fontSize: 14,
+    fontSize: rf(14, 12, 15),
     color: "white",
     textAlign: "center",
     fontWeight: "700",
+    lineHeight: rf(18, 16, 19),
   },
   nameFont: {
     fontFamily: "CategoryBold",
@@ -37,10 +41,11 @@ export const styles = StyleSheet.create({
   },
   // Building Count
   count: {
-    fontSize: 14,
+    fontSize: rf(14, 12, 15),
     color: "white",
     textAlign: "center",
     marginTop: 2,
+    lineHeight: rf(18, 16, 19),
   },
   countFont: {
     fontFamily: "CategoryRegular",
@@ -48,8 +53,8 @@ export const styles = StyleSheet.create({
   // Category Photo Size and Corners
   photo: {
     width: "100%",
-    height: 100,
-    borderRadius: 20,
+    height: rs(92, 76, 100),
+    borderRadius: rs(12, 10, 14),
   },
   // Card Press Feedback
   pressed: { opacity: 0.75 },

@@ -5,19 +5,24 @@ import { useCallback, useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import LimitedAccessModal from "@/components/LimitedAccessModal";
 import {
   OfficialBottomNavigation,
   OfficialProfileActionCard,
 } from "@/components/OfficialDesign";
-import LimitedAccessModal from "@/components/LimitedAccessModal";
-import Background from "../../../assets/design/backgrounds/sixBg.svg";
+import { navigateToTab } from "@/utils/navigation";
 import HelpBackground from "../../../assets/design/backgrounds/ninthBg.svg";
-import Avatar from "../../../assets/design/icons/profile-avatar.svg";
-import Google from "../../../assets/design/logos/google.svg";
-import HelpIcon from "../../../assets/design/icons/profile.svg";
+import Background from "../../../assets/design/backgrounds/sixBg.svg";
+import LoginIcon from "../../../assets/design/icons/login.svg";
 import LogoutIcon from "../../../assets/design/icons/logout.svg";
+import Avatar from "../../../assets/design/icons/profile-avatar.svg";
+import HelpIcon from "../../../assets/design/icons/profile.svg";
+
 import UserIcon from "../../../assets/design/icons/user.svg";
+import Google from "../../../assets/design/logos/google.svg";
 import { signOutUser } from "../../services/userAuth";
+import { styles as helpStyles } from "../../styles/official/helpScreen.styles";
+import { styles } from "../../styles/official/profileScreen.styles";
 import {
   clearStoredUserSession,
   getAppAccessMode,
@@ -27,9 +32,6 @@ import {
   type AppAccessMode,
   type StoredUserSession,
 } from "../../utils/appSession";
-import { navigateToTab } from "@/utils/navigation";
-import { styles as helpStyles } from "../../styles/official/helpScreen.styles";
-import { styles } from "../../styles/official/profileScreen.styles";
 
 const universitySeal = require("../../../assets/design/logos/UM.png");
 const umvcFindLogo = require("../../../assets/design/logos/UMVC-Find.png");
@@ -68,27 +70,77 @@ const helpSections = [
     title: "Contact / Help",
     text: "For incorrect building names, room details, or map information, contact the assigned campus office representative.",
   },
+  {
+    id: "aboutUmvcfind",
+    title: "About UMVCFIND",
+    text: "Version 1.0.0 Built for UMVC campus wayfinding and location discovery.",
+  },
+];
+
+const faqSections = [
+  {
+    id: "purpose",
+    question: "What is UMVCFIND for?",
+    answer:
+      "UMVCFIND helps students, staff, and visitors find UMVC campus buildings, rooms, offices, laboratories, facilities, food areas, and other important locations.",
+  },
+  {
+    id: "account",
+    question: "Do I need an account?",
+    answer:
+      "No. Guests can use the dashboard and campus map. Other features can be made available after signing in or in a later version.",
+  },
+  {
+    id: "changed-details",
+    question: "Why did a building name or detail change?",
+    answer:
+      "Campus information may be updated to keep names, descriptions, and room details accurate.",
+  },
+  {
+    id: "offline",
+    question: "Can I use the app without internet?",
+    answer:
+      "Some information may still appear if it was already loaded, but map tiles, updated details, and current location features work best with an internet connection.",
+  },
+  {
+    id: "location",
+    question: "Why is my current location unavailable?",
+    answer:
+      "Current location depends on phone permission, GPS availability, internet connection, and device settings. The app can still be used without location access.",
+  },
+  {
+    id: "directions",
+    question: "Does UMVCFIND give turn-by-turn directions?",
+    answer:
+      "Not yet. The current version highlights campus places on the map and shows location details. Full step-by-step routing can be added in a later version.",
+  },
 ];
 
 export default function ProfileScreen() {
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [isLimitedAccessOpen, setIsLimitedAccessOpen] = useState(false);
   const [accessMode, setAccessModeState] = useState<AppAccessMode>("guest");
-  const [userSession, setUserSession] = useState<StoredUserSession | null>(null);
+  const [userSession, setUserSession] = useState<StoredUserSession | null>(
+    null,
+  );
   const isGuest = isGuestMode(accessMode);
   const displayName =
-    userSession?.displayName ?? userSession?.email?.split("@")[0] ?? "Guest User";
+    userSession?.displayName ??
+    userSession?.email?.split("@")[0] ??
+    "Guest User";
 
   useFocusEffect(
     useCallback(() => {
       let isActive = true;
 
-      void Promise.all([getAppAccessMode(), getStoredUserSession()]).then(([mode, session]) => {
-        if (isActive) {
-          setAccessModeState(mode);
-          setUserSession(session);
-        }
-      });
+      void Promise.all([getAppAccessMode(), getStoredUserSession()]).then(
+        ([mode, session]) => {
+          if (isActive) {
+            setAccessModeState(mode);
+            setUserSession(session);
+          }
+        },
+      );
 
       return () => {
         isActive = false;
@@ -118,13 +170,21 @@ export default function ProfileScreen() {
     return (
       <View style={helpStyles.screen}>
         <StatusBar style="light" />
-        <SafeAreaView edges={["top", "left", "right"]} style={helpStyles.header}>
+        <SafeAreaView
+          edges={["top", "left", "right"]}
+          style={helpStyles.header}
+        >
           <Pressable
             accessibilityRole="button"
             onPress={() => setIsHelpOpen(false)}
-            style={({ pressed }) => [helpStyles.backButton, pressed && helpStyles.pressed]}
+            style={({ pressed }) => [
+              helpStyles.backButton,
+              pressed && helpStyles.pressed,
+            ]}
           >
-            <Text style={[helpStyles.backText, helpStyles.boldFont]}>Back to Profile</Text>
+            <Text style={[helpStyles.backText, helpStyles.boldFont]}>
+              Back to Profile
+            </Text>
           </Pressable>
         </SafeAreaView>
         <View style={helpStyles.goldDivider} />
@@ -137,9 +197,18 @@ export default function ProfileScreen() {
               preserveAspectRatio="xMidYMid slice"
             />
           </View>
-          <SafeAreaView edges={["left", "right", "bottom"]} style={helpStyles.body}>
-            <ScrollView contentContainerStyle={helpStyles.content} showsVerticalScrollIndicator={false}>
-              <Text accessibilityRole="header" style={[helpStyles.heading, helpStyles.boldFont]}>
+          <SafeAreaView
+            edges={["left", "right", "bottom"]}
+            style={helpStyles.body}
+          >
+            <ScrollView
+              contentContainerStyle={helpStyles.content}
+              showsVerticalScrollIndicator={false}
+            >
+              <Text
+                accessibilityRole="header"
+                style={[helpStyles.heading, helpStyles.boldFont]}
+              >
                 Help & About
               </Text>
               <Text style={[helpStyles.introduction, helpStyles.regularFont]}>
@@ -153,7 +222,10 @@ export default function ProfileScreen() {
                       section.id === "dashboard" && helpStyles.alignRight,
                     ]}
                   >
-                    <Text accessibilityRole="header" style={[helpStyles.heading, helpStyles.boldFont]}>
+                    <Text
+                      accessibilityRole="header"
+                      style={[helpStyles.heading, helpStyles.boldFont]}
+                    >
                       {section.title}
                     </Text>
                     {section.id === "purpose" ? (
@@ -166,10 +238,33 @@ export default function ProfileScreen() {
                     ) : null}
                   </View>
                   <View style={helpStyles.card}>
-                    <Text style={[helpStyles.copy, helpStyles.regularFont]}>{section.text}</Text>
+                    <Text style={[helpStyles.copy, helpStyles.regularFont]}>
+                      {section.text}
+                    </Text>
                   </View>
                 </View>
               ))}
+
+              <View style={helpStyles.faqBlock}>
+                <Text
+                  accessibilityRole="header"
+                  style={[helpStyles.faqTitle, helpStyles.boldFont]}
+                >
+                  FAQs
+                </Text>
+                {faqSections.map((faq) => (
+                  <View key={faq.id} style={helpStyles.faqCard}>
+                    <Text style={[helpStyles.faqQuestion, helpStyles.boldFont]}>
+                      {faq.question}
+                    </Text>
+                    <Text
+                      style={[helpStyles.faqAnswer, helpStyles.regularFont]}
+                    >
+                      {faq.answer}
+                    </Text>
+                  </View>
+                ))}
+              </View>
             </ScrollView>
           </SafeAreaView>
         </View>
@@ -184,7 +279,10 @@ export default function ProfileScreen() {
         <Background width="100%" height="100%" preserveAspectRatio="none" />
       </View>
       <SafeAreaView style={styles.safe} edges={["top", "left", "right"]}>
-        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <ScrollView
+          contentContainerStyle={styles.content}
+          showsVerticalScrollIndicator={false}
+        >
           <View style={styles.header}>
             <Image
               source={universitySeal}
@@ -192,18 +290,34 @@ export default function ProfileScreen() {
               contentFit="contain"
               accessibilityLabel="University of Mindanao seal"
             />
-            <Text style={[styles.brand, styles.brandFont]} numberOfLines={1} adjustsFontSizeToFit>
+            <Text
+              style={[styles.brand, styles.brandFont]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+            >
               UMVC <Text style={styles.gold}>FIND</Text>
             </Text>
           </View>
           <View style={styles.identity}>
-            <Avatar width={121} height={120} accessibilityLabel="Default profile avatar" />
-            <Text style={[styles.name, styles.nameFont]}>{isGuest ? "Guest User" : displayName}</Text>
+            <Avatar
+              width={121}
+              height={120}
+              accessibilityLabel="Default profile avatar"
+            />
+            <Text style={[styles.name, styles.nameFont]}>
+              {isGuest ? "Guest User" : displayName}
+            </Text>
             <Text style={[styles.email, styles.mediumFont]}>
-              {isGuest ? "Sign in to unlock the full app experience." : userSession?.email}
+              {isGuest
+                ? "Sign in to unlock the full app experience."
+                : userSession?.email}
             </Text>
             <View style={styles.badge}>
-              {isGuest ? <UserIcon width={17} height={17} accessible={false} /> : <Google width={17} height={17} accessible={false} />}
+              {isGuest ? (
+                <UserIcon width={17} height={17} accessible={false} />
+              ) : (
+                <Google width={17} height={17} accessible={false} />
+              )}
               <Text style={[styles.badgeText, styles.mediumFont]}>
                 {isGuest ? "GUEST MODE" : "SIGNED IN"}
               </Text>
@@ -218,8 +332,12 @@ export default function ProfileScreen() {
             />
             <OfficialProfileActionCard
               title={isGuest ? "Login" : "Log Out"}
-              description={isGuest ? "Sign in with Google to unlock more features" : "Sign out of your account"}
-              Icon={isGuest ? UserIcon : LogoutIcon}
+              description={
+                isGuest
+                  ? "Sign in with Google to unlock more features"
+                  : "Sign out of your account"
+              }
+              Icon={isGuest ? LoginIcon : LogoutIcon}
               onPress={isGuest ? () => router.replace("/login") : handleLogout}
             />
           </View>

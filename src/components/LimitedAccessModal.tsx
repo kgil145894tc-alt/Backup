@@ -1,5 +1,7 @@
 import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
 
+import { rf, rs } from "@/utils/responsive";
+
 type LimitedAccessModalProps = {
   visible: boolean;
   onClose: () => void;
@@ -32,8 +34,11 @@ export default function LimitedAccessModal({
             <Text style={styles.closeText}>x</Text>
           </Pressable>
 
-          <View style={styles.iconCircle}>
-            <Text style={styles.iconText}>!</Text>
+          <View style={styles.iconCircle} accessible={false}>
+            <View style={styles.lockShackle} />
+            <View style={styles.lockBody}>
+              <View style={styles.lockKeyhole} />
+            </View>
           </View>
 
           <Text style={styles.title}>Limited Access</Text>
@@ -56,7 +61,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     flex: 1,
     justifyContent: "center",
-    padding: 22,
+    padding: rs(22, 18, 28),
   },
 
   backdrop: {
@@ -70,80 +75,109 @@ const styles = StyleSheet.create({
 
   card: {
     alignItems: "center",
-    backgroundColor: "rgba(255,255,255,0.98)",
-    borderColor: "#CDA6AA",
-    borderRadius: 15,
-    borderWidth: 1,
-    elevation: 8,
-    maxWidth: 340,
-    paddingHorizontal: 22,
-    paddingBottom: 22,
-    paddingTop: 30,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 22,
+    elevation: 10,
+    maxWidth: 292,
+    minHeight: 256,
+    paddingBottom: 18,
+    paddingHorizontal: 28,
+    paddingTop: 24,
+    shadowColor: "#000000",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.22,
+    shadowRadius: 18,
     width: "100%",
     zIndex: 2,
   },
 
   closeButton: {
     alignItems: "center",
-    height: 34,
+    height: 35,
     justifyContent: "center",
     position: "absolute",
-    right: 8,
+    right: 11,
     top: 8,
-    width: 34,
+    width: 35,
     zIndex: 3,
   },
 
   closeText: {
-    color: "#AF2532",
+    color: "#C6C1BD",
     fontFamily: "NotificationBold",
-    fontSize: 22,
+    fontSize: rf(31, 28, 32),
+    lineHeight: rf(33, 30, 34),
   },
 
   iconCircle: {
     alignItems: "center",
-    backgroundColor: "#F7E5E3",
-    borderRadius: 38,
-    height: 76,
+    backgroundColor: "#F7E4EA",
+    borderRadius: 39,
+    height: 78,
     justifyContent: "center",
-    marginBottom: 16,
-    width: 76,
+    marginBottom: 7,
+    width: 78,
   },
 
-  iconText: {
-    color: "#AF2532",
-    fontFamily: "NotificationBold",
-    fontSize: 30,
+  lockShackle: {
+    borderColor: "#AF2532",
+    borderRadius: 13,
+    borderWidth: 5,
+    height: 28,
+    marginBottom: -12,
+    width: 27,
+    zIndex: 1,
+  },
+
+  lockBody: {
+    alignItems: "center",
+    backgroundColor: "#AF2532",
+    borderRadius: 3,
+    height: 26,
+    justifyContent: "center",
+    width: 36,
+  },
+
+  lockKeyhole: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 3,
+    height: 8,
+    width: 6,
   },
 
   title: {
     color: "#AF2532",
     fontFamily: "NotificationBold",
-    fontSize: 22,
-    marginBottom: 10,
+    fontSize: rf(18, 17, 19),
+    lineHeight: rf(27, 25, 28),
+    marginBottom: 6,
     textAlign: "center",
   },
 
   message: {
-    color: "#6C757D",
-    fontFamily: "NotificationRegular",
-    fontSize: 15,
-    lineHeight: 21,
-    marginBottom: 20,
+    color: "#24272A",
+    fontFamily: "NotificationBold",
+    fontSize: rf(12, 11, 13),
+    lineHeight: rf(17, 16, 18),
+    marginBottom: 16,
     textAlign: "center",
   },
 
   loginButton: {
     alignItems: "center",
     backgroundColor: "#AF2532",
-    borderRadius: 40,
-    paddingVertical: 13,
+    borderRadius: 9,
+    justifyContent: "center",
+    minHeight: 34,
+    paddingHorizontal: 16,
+    paddingVertical: 7,
     width: "100%",
   },
 
   loginButtonText: {
     color: "white",
     fontFamily: "NotificationBold",
-    fontSize: 18,
+    fontSize: rf(16, 15, 17),
+    lineHeight: rf(21, 20, 22),
   },
 });

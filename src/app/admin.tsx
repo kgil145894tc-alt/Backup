@@ -1,15 +1,31 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ComponentType } from "react";
+import { useFonts } from "expo-font";
+import { Image } from "expo-image";
 import {
   Modal,
   Platform,
   Pressable,
   ScrollView,
-  StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from "react-native";
 
+import DashboardAcademicIcon from "../../assets/admin/dashboard-academic.svg";
+import DashboardAdminIcon from "../../assets/admin/dashboard-admin.svg";
+import DashboardBuildingIcon from "../../assets/admin/dashboard-building.svg";
+import DashboardEditIcon from "../../assets/admin/dashboard-edit.svg";
+import DashboardFacilityIcon from "../../assets/admin/dashboard-facility.svg";
+import DashboardWaves from "../../assets/admin/dashboard-waves.svg";
+import EmailIcon from "../../assets/admin/email.svg";
+import EyeIcon from "../../assets/admin/eye.svg";
+import LockIcon from "../../assets/admin/lock.svg";
+import Waves from "../../assets/admin/waves.svg";
+import FilterIcon from "../../assets/icons/map-filter.svg";
+import SearchIcon from "../../assets/icons/nav-search.svg";
+import { styles } from "../styles/admin.styles";
+import { adminAssets } from "../constants/adminAssets";
 import {
   campusCategories,
   getBuildingRooms,
@@ -44,6 +60,12 @@ import {
   getAdminRoomKey,
   saveAdminRoomEdits,
 } from "../utils/adminRooms";
+import {
+  getAdminStats,
+  getAdminTableContentWidth,
+  getLocationNotificationCopy,
+  toEditableText,
+} from "../utils/adminDashboard";
 
 const categoryOptions = ["All Categories", ...campusCategories];
 const notificationCategoryOptions: CampusNotification["category"][] = [
@@ -53,10 +75,17 @@ const notificationCategoryOptions: CampusNotification["category"][] = [
   "maintenance",
 ];
 
+type AdminSvgIcon = ComponentType<any>;
+
 type NotificationDraft = {
   category: CampusNotification["category"];
   message: string;
   relatedLocationKey: string;
+  title: string;
+};
+
+type SuccessDialogState = {
+  message: string;
   title: string;
 };
 
@@ -67,57 +96,22 @@ const emptyNotificationDraft: NotificationDraft = {
   title: "",
 };
 
-function getAdminStats(locations: AdminLocation[]) {
-  return {
-    totalBuildings: locations.filter((location) => location.type === "building")
-      .length,
-    academicBuildings: locations.filter(
-      (location) =>
-        location.type === "building" || location.category === "Laboratory",
-    ).length,
-    adminBuildings: locations.filter(
-      (location) => location.category === "Office",
-    ).length,
-    facilities: locations.filter(
-      (location) =>
-        location.category === "Facility" || location.category === "Food",
-    ).length,
-  };
-}
-
-function toEditableText(value: string | number | undefined) {
-  return value === undefined ? "" : String(value);
-}
-
-function getLocationNotificationCopy(location: AdminLocation) {
-  if (location.status === "Maintenance") {
-    return {
-      category: "maintenance" as const,
-      message: `${location.name} is currently marked as under maintenance.`,
-      title: "Maintenance Notice",
-    };
-  }
-
-  return {
-    category:
-      location.type === "building"
-        ? "building" as const
-        : "announcement" as const,
-    message: `${location.name} information has been updated.`,
-    title:
-      location.type === "building"
-        ? "Building Information Updated"
-        : "Location Information Updated",
-  };
-}
-
 export default function AdminScreen() {
+  const { width } = useWindowDimensions();
+  const isCompact = width < 980;
+  const isNarrow = width < 720;
+  const tableContentWidth = getAdminTableContentWidth({
+    isCompact,
+    isNarrow,
+    width,
+  });
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [adminSession, setAdminSession] = useState<AdminSession | null>(
     null,
   );
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [loginError, setLoginError] = useState("");
   const [isLoginLoading, setIsLoginLoading] = useState(false);
   const [locations, setLocations] = useState(initialAdminLocations);
@@ -132,10 +126,21 @@ export default function AdminScreen() {
   );
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [saveMessage, setSaveMessage] = useState("");
+  const [successDialog, setSuccessDialog] =
+    useState<SuccessDialogState | null>(null);
   const [isNotificationComposerOpen, setIsNotificationComposerOpen] =
     useState(false);
   const [notificationDraft, setNotificationDraft] =
     useState<NotificationDraft>(emptyNotificationDraft);
+  const [fontsLoaded] = useFonts({
+    AdminRegular: require("../../assets/fonts/afacad-flux-latin-400-normal.ttf"),
+    AdminMedium: require("../../assets/fonts/afacad-flux-latin-500-normal.ttf"),
+    AdminBold: require("../../assets/fonts/afacad-flux-latin-700-normal.ttf"),
+    AdminBrand: require("../../assets/fonts/Angkor-Regular.ttf"),
+    DashboardRegular: require("../../assets/fonts/afacad-flux-latin-400-normal.ttf"),
+    DashboardMedium: require("../../assets/fonts/afacad-flux-latin-500-normal.ttf"),
+    DashboardBrand: require("../../assets/fonts/Angkor-Regular.ttf"),
+  });
 
   useEffect(() => {
     let isActive = true;
@@ -146,15 +151,7 @@ export default function AdminScreen() {
       if (isActive) {
         setLocations(campusData.locations);
         setRoomEdits(campusData.roomEdits);
-        setSaveMessage(
-          campusData.source === "firestore"
-            ? "Loaded admin data from Firestore."
-            : campusData.source === "firestore-empty"
-              ? "Firestore is empty. Loaded local prototype data."
-              : campusData.source === "firestore-fallback"
-                ? "Firestore load failed. Loaded local prototype data."
-                : "",
-        );
+        setSaveMessage("");
         setIsLoadingData(false);
       }
     };
@@ -203,6 +200,10 @@ export default function AdminScreen() {
   const syncLocationToFirestore = async (location: AdminLocation) => {
     if (!canUseFirestore()) {
       setSaveMessage("Saved locally. Firestore is not configured yet.");
+      setSuccessDialog({
+        title: "Changes Saved",
+        message: `${location.name} was saved locally.`,
+      });
       return;
     }
 
@@ -225,6 +226,10 @@ export default function AdminScreen() {
         relatedFeatureType: location.type,
       });
       setSaveMessage("Saved locally and synced to Firestore.");
+      setSuccessDialog({
+        title: "Changes Saved",
+        message: `${location.name} was successfully updated.`,
+      });
     } catch (error) {
       console.warn("Failed to sync location to Firestore", error);
       setSaveMessage("Saved locally, but Firestore sync failed.");
@@ -264,6 +269,10 @@ export default function AdminScreen() {
   const syncRoomToFirestore = async (room: BuildingRoom) => {
     if (!canUseFirestore()) {
       setSaveMessage("Room saved locally. Firestore is not configured yet.");
+      setSuccessDialog({
+        title: "Room Saved",
+        message: `${room.name} was saved locally.`,
+      });
       return;
     }
 
@@ -281,6 +290,10 @@ export default function AdminScreen() {
         relatedFeatureType: room.type,
       });
       setSaveMessage("Room saved locally and synced to Firestore.");
+      setSuccessDialog({
+        title: "Room Saved",
+        message: `${room.name} was successfully updated.`,
+      });
     } catch (error) {
       console.warn("Failed to sync room to Firestore", error);
       setSaveMessage("Room saved locally, but Firestore sync failed.");
@@ -343,6 +356,10 @@ export default function AdminScreen() {
       setNotificationDraft(emptyNotificationDraft);
       setIsNotificationComposerOpen(false);
       setSaveMessage("Notification published to users.");
+      setSuccessDialog({
+        title: "Notification Published",
+        message: "Your notification was successfully sent to users.",
+      });
     } catch (error) {
       console.warn("Failed to publish manual notification", error);
       setSaveMessage("Notification publish failed. Check Firestore rules.");
@@ -383,99 +400,343 @@ export default function AdminScreen() {
     );
   }
 
-  if (!isLoggedIn) {
+  if (!fontsLoaded) {
     return (
-      <View style={styles.loginContainer}>
-        <View style={styles.loginBrandPanel}>
-          <View style={styles.logoBox}>
-            <Text style={styles.logoText}>UM</Text>
-          </View>
-          <Text style={styles.loginBrandTitle}>UMVC FIND</Text>
-          <Text style={styles.loginBrandSubtitle}>
-            Manage campus data and location information.
-          </Text>
-        </View>
-
-        <View style={styles.loginPanel}>
-          <View style={styles.adminIcon}>
-            <Text style={styles.adminIconText}>A</Text>
-          </View>
-          <Text style={styles.loginTitle}>Admin Login</Text>
-          <Text style={styles.loginSubtitle}>
-            Access the administration panel
-          </Text>
-
-          <Text style={styles.inputLabel}>Email / Admin</Text>
-          <TextInput
-            autoCapitalize="none"
-            onChangeText={setEmail}
-            placeholder="Email / Admin Username"
-            style={styles.input}
-            value={email}
-          />
-
-          <Text style={styles.inputLabel}>Password</Text>
-          <TextInput
-            onChangeText={setPassword}
-            placeholder="Enter your password"
-            secureTextEntry
-            style={styles.input}
-            value={password}
-          />
-
-          {loginError ? (
-            <Text style={styles.loginError}>{loginError}</Text>
-          ) : null}
-
-          <Pressable
-            disabled={isLoginLoading}
-            style={[
-              styles.primaryButton,
-              isLoginLoading && styles.primaryButtonDisabled,
-            ]}
-            onPress={handleAdminLogin}
-          >
-            <Text style={styles.primaryButtonText}>
-              {isLoginLoading ? "Logging in..." : "Login"}
-            </Text>
-          </Pressable>
-        </View>
+      <View style={styles.webOnlyContainer}>
+        <Text style={styles.webOnlyTitle}>Loading admin...</Text>
       </View>
     );
   }
 
-  return (
-    <View style={styles.adminShell}>
-      <View style={styles.sidebar}>
-        <View style={styles.sidebarLogoRow}>
-          <View style={styles.sidebarLogo}>
-            <Text style={styles.sidebarLogoText}>UM</Text>
+  if (!isLoggedIn) {
+    return (
+      <ScrollView
+        contentContainerStyle={[
+          styles.loginScrollContent,
+          isCompact && styles.loginScrollContentCompact,
+        ]}
+        keyboardShouldPersistTaps="handled"
+      >
+        <View
+          style={[
+            styles.loginContainer,
+            isCompact && styles.loginContainerCompact,
+            isNarrow && styles.loginContainerNarrow,
+          ]}
+        >
+          <View
+            style={[
+              styles.loginBrandPanel,
+              isCompact && styles.loginBrandPanelCompact,
+              isNarrow && styles.loginBrandPanelNarrow,
+            ]}
+          >
+            <Image
+              contentFit="cover"
+              source={adminAssets.campus}
+              style={styles.loginCampusImage}
+            />
+            <Image
+              contentFit="cover"
+              source={adminAssets.watermark}
+              style={styles.loginWatermark}
+            />
+            <View
+              style={[
+                styles.loginTopDivider,
+                isNarrow && styles.loginTopDividerNarrow,
+              ]}
+            >
+              <View style={styles.loginDividerDot} />
+              <View style={styles.loginDividerLine} />
+              <Image source={adminAssets.plane} style={styles.loginPlane} />
+              <View style={styles.loginDividerLine} />
+              <View style={styles.loginDividerDot} />
+            </View>
+
+            <View
+              style={[
+                styles.loginBrandContent,
+                isCompact && styles.loginBrandContentCompact,
+                isNarrow && styles.loginBrandContentNarrow,
+              ]}
+            >
+              <View style={styles.loginBrandRow}>
+                <Image
+                  contentFit="contain"
+                  source={adminAssets.logo}
+                  style={[
+                    styles.loginLogoImage,
+                    isNarrow && styles.loginLogoImageNarrow,
+                  ]}
+                />
+                <View>
+                  <Text
+                    style={[
+                      styles.loginBrandTitle,
+                      isNarrow && styles.loginBrandTitleNarrow,
+                    ]}
+                  >
+                    UMVC
+                  </Text>
+                  <Text
+                    style={[
+                      styles.loginBrandTitle,
+                      styles.loginBrandGold,
+                      isNarrow && styles.loginBrandTitleNarrow,
+                    ]}
+                  >
+                    FIND
+                  </Text>
+                </View>
+              </View>
+              <View
+                style={[
+                  styles.loginTaglineDivider,
+                  isNarrow && styles.loginTaglineDividerNarrow,
+                ]}
+              />
+              <View
+                style={[
+                  styles.loginTaglineRow,
+                  isNarrow && styles.loginTaglineRowNarrow,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.loginTagline,
+                    isNarrow && styles.loginTaglineNarrow,
+                  ]}
+                >
+                  Manage
+                </Text>
+                <View style={styles.loginDividerDot} />
+                <Text
+                  style={[
+                    styles.loginTagline,
+                    isNarrow && styles.loginTaglineNarrow,
+                  ]}
+                >
+                  Locate
+                </Text>
+                <View style={styles.loginDividerDot} />
+                <Text
+                  style={[
+                    styles.loginTagline,
+                    isNarrow && styles.loginTaglineNarrow,
+                  ]}
+                >
+                  Explore
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.loginWaves} pointerEvents="none">
+              <Waves width="100%" height="100%" preserveAspectRatio="none" />
+            </View>
           </View>
-          <Text style={styles.sidebarBrand}>UMVC FIND</Text>
+
+          <View
+            style={[
+              styles.loginPanel,
+              isCompact && styles.loginPanelCompact,
+              isNarrow && styles.loginPanelNarrow,
+            ]}
+          >
+            <Image
+              contentFit="cover"
+              source={adminAssets.formBackground}
+              style={styles.loginFormBackground}
+            />
+            <View
+              style={[styles.loginForm, isNarrow && styles.loginFormNarrow]}
+            >
+              <Image
+                contentFit="contain"
+                source={adminAssets.adminAvatar}
+                style={[
+                  styles.adminAvatarImage,
+                  isNarrow && styles.adminAvatarImageNarrow,
+                ]}
+              />
+              <Text
+                style={[styles.loginTitle, isNarrow && styles.loginTitleNarrow]}
+              >
+                Admin Login
+              </Text>
+              <Text
+                style={[
+                  styles.loginSubtitle,
+                  isNarrow && styles.loginSubtitleNarrow,
+                ]}
+              >
+                Access the administration panel
+              </Text>
+
+              <Text
+                style={[styles.inputLabel, isNarrow && styles.inputLabelNarrow]}
+              >
+                Email / Admin
+              </Text>
+              <View
+                style={[
+                  styles.loginInputRow,
+                  isNarrow && styles.loginInputRowNarrow,
+                ]}
+              >
+                <EmailIcon width={18} height={18} />
+                <TextInput
+                  autoCapitalize="none"
+                  autoComplete="username"
+                  onChangeText={setEmail}
+                  placeholder="Email / Admin Username"
+                  placeholderTextColor="#B5B7B9"
+                  style={[
+                    styles.loginInput,
+                    isNarrow && styles.loginInputNarrow,
+                  ]}
+                  value={email}
+                />
+              </View>
+
+              <Text
+                style={[styles.inputLabel, isNarrow && styles.inputLabelNarrow]}
+              >
+                Password
+              </Text>
+              <View
+                style={[
+                  styles.loginInputRow,
+                  isNarrow && styles.loginInputRowNarrow,
+                ]}
+              >
+                <LockIcon width={18} height={18} />
+                <TextInput
+                  autoCapitalize="none"
+                  autoComplete="current-password"
+                  onChangeText={setPassword}
+                  placeholder="Enter your password"
+                  placeholderTextColor="#B5B7B9"
+                  secureTextEntry={!showPassword}
+                  style={[
+                    styles.loginInput,
+                    isNarrow && styles.loginInputNarrow,
+                  ]}
+                  value={password}
+                />
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={
+                    showPassword ? "Hide password" : "Show password"
+                  }
+                  accessibilityState={{ selected: showPassword }}
+                  onPress={() => setShowPassword(!showPassword)}
+                  style={({ hovered, pressed }: any) => [
+                    styles.eyeButton,
+                    isNarrow && styles.eyeButtonNarrow,
+                    hovered && styles.iconButtonHover,
+                    pressed && styles.buttonPressed,
+                  ]}
+                >
+                  <EyeIcon width={18} height={18} />
+                </Pressable>
+              </View>
+
+              {loginError ? (
+                <Text
+                  style={[
+                    styles.loginError,
+                    isNarrow && styles.loginErrorNarrow,
+                  ]}
+                >
+                  {loginError}
+                </Text>
+              ) : null}
+
+              <Pressable
+                disabled={isLoginLoading}
+                onPress={handleAdminLogin}
+                style={({ hovered, pressed }: any) => [
+                  styles.primaryButton,
+                  isNarrow && styles.primaryButtonNarrow,
+                  hovered && !isLoginLoading && styles.primaryButtonHover,
+                  pressed && !isLoginLoading && styles.buttonPressed,
+                  isLoginLoading && styles.primaryButtonDisabled,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.primaryButtonText,
+                    isNarrow && styles.primaryButtonTextNarrow,
+                  ]}
+                >
+                  {isLoginLoading ? "Logging in..." : "Login"}
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </ScrollView>
+    );
+  }
+
+  return (
+    <View style={[styles.adminShell, isCompact && styles.adminShellCompact]}>
+      <View style={[styles.sidebar, isCompact && styles.sidebarCompact]}>
+        <Image
+          contentFit="cover"
+          source={adminAssets.campus}
+          style={styles.sidebarCampusImage}
+        />
+        <View style={styles.sidebarOverlay} />
+        <View style={styles.sidebarLogoRow}>
+          <Image
+            contentFit="contain"
+            source={adminAssets.logo}
+            style={styles.sidebarLogoImage}
+          />
+          <View>
+            <Text style={styles.sidebarBrand}>UMVC</Text>
+            <Text style={[styles.sidebarBrand, styles.sidebarBrandGold]}>
+              FIND
+            </Text>
+          </View>
         </View>
 
-        <Text style={styles.sidebarLabel}>Admin</Text>
-        <Text style={styles.sidebarItem}>Building Management</Text>
-        <Text style={styles.sidebarItem}>Locations</Text>
-        <Text style={styles.sidebarItem}>Rooms</Text>
+        <View style={styles.sidebarWaves} pointerEvents="none">
+          <DashboardWaves
+            width="100%"
+            height="100%"
+            preserveAspectRatio="none"
+          />
+        </View>
       </View>
 
-      <ScrollView contentContainerStyle={styles.adminContent}>
-        <View style={styles.adminHeader}>
-          <View>
-            <Text style={styles.pageTitle}>Building Management</Text>
-            <Text style={styles.pageSubtitle}>
-              Manage campus buildings, rooms, and location details.
-            </Text>
-            {saveMessage ? (
-              <Text style={styles.saveMessage}>{saveMessage}</Text>
-            ) : null}
+      <ScrollView
+        contentContainerStyle={[
+          styles.adminContent,
+          isNarrow && styles.adminContentNarrow,
+        ]}
+      >
+        <View style={[styles.adminHeader, isNarrow && styles.adminHeaderNarrow]}>
+          <View style={[styles.headingGroup, isNarrow && styles.headingGroupNarrow]}>
+            <View style={styles.headingIconCircle}>
+              <DashboardBuildingIcon width={34} height={34} />
+            </View>
+            <View>
+              <Text style={styles.pageTitle}>Location Management</Text>
+              <Text style={styles.pageSubtitle}>
+                Manage campus buildings, rooms, and location details.
+              </Text>
+            </View>
           </View>
 
-          <View style={styles.adminUserCard}>
-            <View style={styles.userAvatar}>
-              <Text style={styles.userAvatarText}>A</Text>
-            </View>
+          <View style={[styles.adminUserCard, isNarrow && styles.adminUserCardNarrow]}>
+            <Image
+              contentFit="cover"
+              source={adminAssets.dashboardUser}
+              style={styles.userAvatar}
+            />
             <View>
               <Text style={styles.userName}>
                 {adminSession?.email ?? "Admin User"}
@@ -487,19 +748,21 @@ export default function AdminScreen() {
               </Text>
             </View>
             <Pressable
-              style={styles.resetButton}
-              onPress={resetLocalChanges}
-            >
-              <Text style={styles.resetButtonText}>Reset</Text>
-            </Pressable>
-            <Pressable
-              style={styles.resetButton}
+              style={({ hovered, pressed }: any) => [
+                styles.resetButton,
+                hovered && styles.outlineButtonHover,
+                pressed && styles.buttonPressed,
+              ]}
               onPress={() => setIsNotificationComposerOpen(true)}
             >
               <Text style={styles.resetButtonText}>New Notification</Text>
             </Pressable>
             <Pressable
-              style={styles.logoutButton}
+              style={({ hovered, pressed }: any) => [
+                styles.logoutButton,
+                hovered && styles.logoutButtonHover,
+                pressed && styles.buttonPressed,
+              ]}
               onPress={handleAdminLogout}
             >
               <Text style={styles.logoutButtonText}>Logout</Text>
@@ -508,23 +771,40 @@ export default function AdminScreen() {
         </View>
 
         <View style={styles.statsGrid}>
-          <StatCard label="Total Buildings" value={stats.totalBuildings} />
           <StatCard
+            Icon={DashboardBuildingIcon}
+            label="Total Buildings"
+            value={stats.totalBuildings}
+          />
+          <StatCard
+            Icon={DashboardAcademicIcon}
             label="Academic Buildings"
             value={stats.academicBuildings}
           />
-          <StatCard label="Admin Buildings" value={stats.adminBuildings} />
-          <StatCard label="Facilities and Others" value={stats.facilities} />
+          <StatCard
+            Icon={DashboardAdminIcon}
+            label="Admin Buildings"
+            value={stats.adminBuildings}
+          />
+          <StatCard
+            Icon={DashboardFacilityIcon}
+            label="Facilities and Others"
+            value={stats.facilities}
+          />
         </View>
 
         <View style={styles.toolbar}>
-          <TextInput
-            autoCapitalize="none"
-            onChangeText={setSearchQuery}
-            placeholder="Search building or room..."
-            style={styles.searchInput}
-            value={searchQuery}
-          />
+          <View style={styles.searchBox}>
+            <SearchIcon width={22} height={22} />
+            <TextInput
+              autoCapitalize="none"
+              onChangeText={setSearchQuery}
+              placeholder="Search building or room..."
+              placeholderTextColor="#9ca3af"
+              style={styles.searchInput}
+              value={searchQuery}
+            />
+          </View>
 
           <ScrollView
             contentContainerStyle={styles.filterList}
@@ -534,12 +814,20 @@ export default function AdminScreen() {
             {categoryOptions.map((category) => (
               <Pressable
                 key={category}
-                style={[
+                style={({ hovered, pressed }: any) => [
                   styles.filterChip,
+                  hovered && styles.filterChipHover,
                   selectedCategory === category && styles.filterChipActive,
+                  hovered &&
+                    selectedCategory === category &&
+                    styles.filterChipActiveHover,
+                  pressed && styles.buttonPressed,
                 ]}
                 onPress={() => setSelectedCategory(category)}
               >
+                {category === selectedCategory ? (
+                  <FilterIcon width={14} height={14} color="#ffffff" />
+                ) : null}
                 <Text
                   style={[
                     styles.filterChipText,
@@ -555,56 +843,68 @@ export default function AdminScreen() {
         </View>
 
         <View style={styles.tableCard}>
-          <View style={[styles.tableRow, styles.tableHeader]}>
-            <Text style={[styles.tableCell, styles.nameCell]}>
-              Building Name
-            </Text>
-            <Text style={styles.tableCell}>Category</Text>
-            <Text style={styles.tableCell}>Floors</Text>
-            <Text style={styles.tableCell}>Status</Text>
-            <Text style={styles.actionsCell}>Actions</Text>
-          </View>
-
-          {isLoadingData ? (
-            <View style={styles.loadingRow}>
-              <Text style={styles.loadingText}>Loading admin data...</Text>
-            </View>
-          ) : (
-            filteredLocations.map((location) => (
-              <View
-                key={`${location.type}-${location.id}`}
-                style={styles.tableRow}
-              >
-                <View style={styles.nameCell}>
-                  <Text style={styles.locationName}>{location.name}</Text>
-                  <Text style={styles.locationDescription} numberOfLines={1}>
-                    {location.description ?? location.nearby ?? location.type}
-                  </Text>
-                </View>
-                <Text style={styles.tableCell}>{location.category}</Text>
-                <Text style={styles.tableCell}>
-                  {toEditableText(location.floors || location.floor) || "-"}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <View style={[styles.tableInner, { width: tableContentWidth }]}>
+              <View style={[styles.tableRow, styles.tableHeader]}>
+                <Text style={[styles.tableCell, styles.nameCell]}>
+                  Building Name
                 </Text>
-                <Text style={styles.tableCell}>{location.status}</Text>
-                <View style={styles.actionsCell}>
-                  {location.type === "building" ? (
-                    <Pressable
-                      style={styles.secondaryActionButton}
-                      onPress={() => setRoomLocation(location)}
-                    >
-                      <Text style={styles.secondaryActionText}>Rooms</Text>
-                    </Pressable>
-                  ) : null}
-                  <Pressable
-                    style={styles.editButton}
-                    onPress={() => setEditingLocation(location)}
-                  >
-                    <Text style={styles.editButtonText}>Edit</Text>
-                  </Pressable>
-                </View>
+                <Text style={styles.tableCell}>Category</Text>
+                <Text style={styles.tableCell}>Floors</Text>
+                <Text style={styles.tableCell}>Status</Text>
+                <Text style={styles.actionsCell}>Actions</Text>
               </View>
-            ))
-          )}
+
+              {isLoadingData ? (
+                <View style={styles.loadingRow}>
+                  <Text style={styles.loadingText}>Loading admin data...</Text>
+                </View>
+              ) : (
+                filteredLocations.map((location) => (
+                  <View
+                    key={`${location.type}-${location.id}`}
+                    style={styles.tableRow}
+                  >
+                    <View style={styles.nameCell}>
+                      <Text style={styles.locationName}>{location.name}</Text>
+                      <Text style={styles.locationDescription} numberOfLines={1}>
+                        {location.description ?? location.nearby ?? location.type}
+                      </Text>
+                    </View>
+                    <Text style={styles.tableCell}>{location.category}</Text>
+                    <Text style={styles.tableCell}>
+                      {toEditableText(location.floors || location.floor) || "-"}
+                    </Text>
+                    <Text style={styles.tableCell}>{location.status}</Text>
+                    <View style={styles.actionsCell}>
+                      {location.type === "building" ? (
+                        <Pressable
+                          style={({ hovered, pressed }: any) => [
+                            styles.secondaryActionButton,
+                            hovered && styles.outlineButtonHover,
+                            pressed && styles.buttonPressed,
+                          ]}
+                          onPress={() => setRoomLocation(location)}
+                        >
+                          <Text style={styles.secondaryActionText}>Rooms</Text>
+                        </Pressable>
+                      ) : null}
+                      <Pressable
+                        style={({ hovered, pressed }: any) => [
+                          styles.editButton,
+                          hovered && styles.editButtonHover,
+                          pressed && styles.buttonPressed,
+                        ]}
+                        onPress={() => setEditingLocation(location)}
+                      >
+                        <DashboardEditIcon width={22} height={22} />
+                      </Pressable>
+                    </View>
+                  </View>
+                ))
+              )}
+            </View>
+          </ScrollView>
         </View>
       </ScrollView>
 
@@ -641,21 +941,33 @@ export default function AdminScreen() {
         onPublish={publishManualNotification}
         visible={isNotificationComposerOpen}
       />
+
+      <SuccessDialog
+        state={successDialog}
+        onClose={() => setSuccessDialog(null)}
+      />
     </View>
   );
 }
 
 function StatCard({
+  Icon,
   label,
   value,
 }: {
+  Icon?: AdminSvgIcon;
   label: string;
   value: number;
 }) {
   return (
     <View style={styles.statCard}>
-      <Text style={styles.statValue}>{value}</Text>
-      <Text style={styles.statLabel}>{label}</Text>
+      <View style={styles.statIconWrap}>
+        {Icon ? <Icon width={34} height={34} /> : null}
+      </View>
+      <View>
+        <Text style={styles.statValue}>{value}</Text>
+        <Text style={styles.statLabel}>{label}</Text>
+      </View>
     </View>
   );
 }
@@ -673,31 +985,33 @@ function EditLocationModal({
   onOpenRooms: (location: AdminLocation) => void;
   onSave: () => void;
 }) {
+  const { width } = useWindowDimensions();
+  const isNarrow = width < 720;
+
   return (
     <Modal transparent visible={Boolean(location)} animationType="fade">
-      <View style={styles.modalOverlay}>
+      <View style={[styles.modalOverlay, isNarrow && styles.modalOverlayNarrow]}>
         {location ? (
-          <View style={styles.editModal}>
+          <View style={[styles.editModal, isNarrow && styles.modalNarrow]}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Edit Location</Text>
-              <Pressable onPress={onClose}>
+              <Pressable
+                onPress={onClose}
+                style={({ hovered, pressed }: any) => [
+                  styles.modalCloseButton,
+                  hovered && styles.iconButtonHover,
+                  pressed && styles.buttonPressed,
+                ]}
+              >
                 <Text style={styles.modalClose}>x</Text>
               </Pressable>
             </View>
 
-            <View style={styles.editContent}>
-              <View style={styles.editPreviewColumn}>
-                <View style={styles.editImagePreview}>
-                  <Text style={styles.editImageText}>Photo</Text>
-                </View>
-
-                <Pressable style={styles.changePhotoButton}>
-                  <Text style={styles.changePhotoText}>Change Photo</Text>
-                </Pressable>
-
-                <Text style={styles.photoHint}>PNG, JPG, max 5MB</Text>
-              </View>
-
+            <ScrollView
+              contentContainerStyle={styles.editScrollContent}
+              showsVerticalScrollIndicator={false}
+              style={styles.editScroll}
+            >
               <View style={styles.editFormColumn}>
                 <View style={styles.compactFormGrid}>
                   <AdminTextField
@@ -756,10 +1070,15 @@ function EditLocationModal({
                       (status) => (
                         <Pressable
                           key={status}
-                          style={[
+                          style={({ hovered, pressed }: any) => [
                             styles.statusButton,
+                            hovered && styles.statusButtonHover,
                             location.status === status &&
                               styles.statusButtonActive,
+                            hovered &&
+                              location.status === status &&
+                              styles.statusButtonActiveHover,
+                            pressed && styles.buttonPressed,
                           ]}
                           onPress={() =>
                             onChange({ ...location, status })
@@ -825,11 +1144,15 @@ function EditLocationModal({
                   }
                 />
               </View>
-            </View>
+            </ScrollView>
 
             {location.type === "building" ? (
               <Pressable
-                style={styles.manageRoomsRow}
+                style={({ hovered, pressed }: any) => [
+                  styles.manageRoomsRow,
+                  hovered && styles.outlineButtonHover,
+                  pressed && styles.buttonPressed,
+                ]}
                 onPress={() => onOpenRooms(location)}
               >
                 <Text style={styles.manageRoomsText}>
@@ -840,10 +1163,24 @@ function EditLocationModal({
             ) : null}
 
             <View style={styles.modalFooter}>
-              <Pressable style={styles.cancelButton} onPress={onClose}>
+              <Pressable
+                style={({ hovered, pressed }: any) => [
+                  styles.cancelButton,
+                  hovered && styles.cancelButtonHover,
+                  pressed && styles.buttonPressed,
+                ]}
+                onPress={onClose}
+              >
                 <Text style={styles.cancelButtonText}>Cancel</Text>
               </Pressable>
-              <Pressable style={styles.saveButton} onPress={onSave}>
+              <Pressable
+                style={({ hovered, pressed }: any) => [
+                  styles.saveButton,
+                  hovered && styles.saveButtonHover,
+                  pressed && styles.buttonPressed,
+                ]}
+                onPress={onSave}
+              >
                 <Text style={styles.saveButtonText}>Save</Text>
               </Pressable>
             </View>
@@ -889,6 +1226,8 @@ function RoomsModal({
   roomEdits: Record<string, BuildingRoom>;
   onClose: () => void;
 }) {
+  const { width } = useWindowDimensions();
+  const isNarrow = width < 720;
   const rooms = location
     ? applyAdminRoomEdits(getBuildingRooms(location.id), roomEdits)
     : [];
@@ -896,50 +1235,74 @@ function RoomsModal({
 
   return (
     <Modal transparent visible={Boolean(location)} animationType="fade">
-      <View style={styles.modalOverlay}>
+      <View style={[styles.modalOverlay, isNarrow && styles.modalOverlayNarrow]}>
         {location ? (
-          <View style={styles.roomsModal}>
+          <View style={[styles.roomsModal, isNarrow && styles.modalNarrow]}>
             <View style={styles.modalHeader}>
               <View>
                 <Text style={styles.modalTitle}>Floors and Rooms</Text>
                 <Text style={styles.modalSubtitle}>{location.name}</Text>
               </View>
-              <Pressable onPress={onClose}>
+              <Pressable
+                onPress={onClose}
+                style={({ hovered, pressed }: any) => [
+                  styles.modalCloseButton,
+                  hovered && styles.iconButtonHover,
+                  pressed && styles.buttonPressed,
+                ]}
+              >
                 <Text style={styles.modalClose}>x</Text>
               </Pressable>
             </View>
 
-            {floors.length ? (
-              floors.map((floor) => (
-                <View key={floor} style={styles.floorGroup}>
-                  <Text style={styles.floorTitle}>Floor {floor}</Text>
-                  {rooms
-                    .filter((room) => room.floorNumber === floor)
-                    .map((room) => (
-                      <View key={room.id} style={styles.roomRow}>
-                        <Text style={styles.roomNumber}>{room.name}</Text>
-                        <Text style={styles.roomType}>{room.type}</Text>
-                        <Pressable
-                          style={styles.smallEditButton}
-                          onPress={() => onEditRoom(room)}
-                        >
-                          <Text style={styles.smallEditText}>Edit</Text>
-                        </Pressable>
-                      </View>
-                    ))}
+            <ScrollView
+              contentContainerStyle={styles.roomsScrollContent}
+              showsVerticalScrollIndicator={false}
+              style={styles.roomsScroll}
+            >
+              {floors.length ? (
+                floors.map((floor) => (
+                  <View key={floor} style={styles.floorGroup}>
+                    <Text style={styles.floorTitle}>Floor {floor}</Text>
+                    {rooms
+                      .filter((room) => room.floorNumber === floor)
+                      .map((room) => (
+                        <View key={room.id} style={styles.roomRow}>
+                          <Text style={styles.roomNumber}>{room.name}</Text>
+                          <Text style={styles.roomType}>{room.type}</Text>
+                          <Pressable
+                            style={({ hovered, pressed }: any) => [
+                              styles.smallEditButton,
+                              hovered && styles.outlineButtonHover,
+                              pressed && styles.buttonPressed,
+                            ]}
+                            onPress={() => onEditRoom(room)}
+                          >
+                            <Text style={styles.smallEditText}>Edit</Text>
+                          </Pressable>
+                        </View>
+                      ))}
+                  </View>
+                ))
+              ) : (
+                <View style={styles.emptyRooms}>
+                  <Text style={styles.emptyRoomsTitle}>No rooms added yet</Text>
+                  <Text style={styles.emptyRoomsText}>
+                    Room editing can be connected here after the admin data
+                    model is finalized.
+                  </Text>
                 </View>
-              ))
-            ) : (
-              <View style={styles.emptyRooms}>
-                <Text style={styles.emptyRoomsTitle}>No rooms added yet</Text>
-                <Text style={styles.emptyRoomsText}>
-                  Room editing can be connected here after the admin data model
-                  is finalized.
-                </Text>
-              </View>
-            )}
+              )}
+            </ScrollView>
 
-            <Pressable style={styles.saveButton} onPress={onClose}>
+            <Pressable
+              style={({ hovered, pressed }: any) => [
+                styles.saveButton,
+                hovered && styles.saveButtonHover,
+                pressed && styles.buttonPressed,
+              ]}
+              onPress={onClose}
+            >
               <Text style={styles.saveButtonText}>Done</Text>
             </Pressable>
           </View>
@@ -960,32 +1323,30 @@ function EditRoomModal({
   onClose: () => void;
   onSave: () => void;
 }) {
+  const { width } = useWindowDimensions();
+  const isNarrow = width < 720;
+
   return (
     <Modal transparent visible={Boolean(room)} animationType="fade">
-      <View style={styles.modalOverlay}>
+      <View style={[styles.modalOverlay, isNarrow && styles.modalOverlayNarrow]}>
         {room ? (
-          <View style={styles.roomEditModal}>
+          <View style={[styles.roomEditModal, isNarrow && styles.modalNarrow]}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Edit Room</Text>
-              <Pressable onPress={onClose}>
+              <Pressable
+                onPress={onClose}
+                style={({ hovered, pressed }: any) => [
+                  styles.modalCloseButton,
+                  hovered && styles.iconButtonHover,
+                  pressed && styles.buttonPressed,
+                ]}
+              >
                 <Text style={styles.modalClose}>x</Text>
               </Pressable>
             </View>
 
-            <View style={styles.roomEditContent}>
-              <View style={styles.roomPhotoColumn}>
-                <View style={styles.roomImagePreview}>
-                  <Text style={styles.editImageText}>Photo</Text>
-                </View>
-
-                <Pressable style={styles.changePhotoButton}>
-                  <Text style={styles.changePhotoText}>Change Photo</Text>
-                </Pressable>
-
-                <Text style={styles.photoHint}>JPG, PNG, max 10MB</Text>
-              </View>
-
-              <View style={styles.roomEditForm}>
+            <View style={styles.roomEditForm}>
+              <View style={styles.roomEditFieldRow}>
                 <AdminTextField
                   compact
                   label="Room Name"
@@ -1001,25 +1362,39 @@ function EditRoomModal({
                     onChange({ ...room, type: type as never })
                   }
                 />
-
-                <Text style={styles.inputLabel}>Description</Text>
-                <TextInput
-                  multiline
-                  onChangeText={(description) =>
-                    onChange({ ...room, description })
-                  }
-                  placeholder="Room description"
-                  style={[styles.input, styles.roomDescriptionInput]}
-                  value={room.description ?? ""}
-                />
               </View>
+
+              <Text style={styles.inputLabel}>Description</Text>
+              <TextInput
+                multiline
+                onChangeText={(description) =>
+                  onChange({ ...room, description })
+                }
+                placeholder="Room description"
+                style={[styles.input, styles.roomDescriptionInput]}
+                value={room.description ?? ""}
+              />
             </View>
 
             <View style={styles.modalFooter}>
-              <Pressable style={styles.cancelButton} onPress={onClose}>
+              <Pressable
+                style={({ hovered, pressed }: any) => [
+                  styles.cancelButton,
+                  hovered && styles.cancelButtonHover,
+                  pressed && styles.buttonPressed,
+                ]}
+                onPress={onClose}
+              >
                 <Text style={styles.cancelButtonText}>Cancel</Text>
               </Pressable>
-              <Pressable style={styles.saveButton} onPress={onSave}>
+              <Pressable
+                style={({ hovered, pressed }: any) => [
+                  styles.saveButton,
+                  hovered && styles.saveButtonHover,
+                  pressed && styles.buttonPressed,
+                ]}
+                onPress={onSave}
+              >
                 <Text style={styles.saveButtonText}>Save</Text>
               </Pressable>
             </View>
@@ -1045,10 +1420,18 @@ function NotificationComposerModal({
   onPublish: () => void;
   visible: boolean;
 }) {
+  const { width } = useWindowDimensions();
+  const isNarrow = width < 720;
+
   return (
     <Modal transparent visible={visible} animationType="fade">
-      <View style={styles.modalOverlay}>
-        <View style={styles.notificationComposerModal}>
+      <View style={[styles.modalOverlay, isNarrow && styles.modalOverlayNarrow]}>
+        <View
+          style={[
+            styles.notificationComposerModal,
+            isNarrow && styles.modalNarrow,
+          ]}
+        >
           <View style={styles.modalHeader}>
             <View>
               <Text style={styles.modalTitle}>New Notification</Text>
@@ -1056,25 +1439,44 @@ function NotificationComposerModal({
                 Publish an update users can view from Home.
               </Text>
             </View>
-            <Pressable onPress={onClose}>
+            <Pressable
+              onPress={onClose}
+              style={({ hovered, pressed }: any) => [
+                styles.modalCloseButton,
+                hovered && styles.iconButtonHover,
+                pressed && styles.buttonPressed,
+              ]}
+            >
               <Text style={styles.modalClose}>x</Text>
             </Pressable>
           </View>
 
-          <AdminTextField
-            label="Title"
-            value={draft.title}
-            onChangeText={(title) => onChange({ ...draft, title })}
-          />
+          <ScrollView
+            contentContainerStyle={styles.notificationComposerContent}
+            showsVerticalScrollIndicator={false}
+            style={styles.notificationComposerScroll}
+          >
+            <View style={styles.notificationField}>
+              <AdminTextField
+                label="Title"
+                value={draft.title}
+                onChangeText={(title) => onChange({ ...draft, title })}
+              />
+            </View>
 
-          <Text style={styles.inputLabel}>Category</Text>
-          <View style={styles.notificationCategoryList}>
-            {notificationCategoryOptions.map((category) => (
+            <Text style={styles.inputLabel}>Category</Text>
+            <View style={styles.notificationCategoryList}>
+              {notificationCategoryOptions.map((category) => (
               <Pressable
                 key={category}
-                style={[
+                style={({ hovered, pressed }: any) => [
                   styles.statusButton,
+                  hovered && styles.statusButtonHover,
                   draft.category === category && styles.statusButtonActive,
+                  hovered &&
+                    draft.category === category &&
+                    styles.statusButtonActiveHover,
+                  pressed && styles.buttonPressed,
                 ]}
                 onPress={() => onChange({ ...draft, category })}
               >
@@ -1088,80 +1490,101 @@ function NotificationComposerModal({
                   {category}
                 </Text>
               </Pressable>
-            ))}
-          </View>
+              ))}
+            </View>
 
-          <Text style={styles.inputLabel}>Related Location</Text>
-          <ScrollView
-            contentContainerStyle={styles.relatedLocationList}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-          >
-            <Pressable
-              style={[
-                styles.filterChip,
-                !draft.relatedLocationKey && styles.filterChipActive,
-              ]}
-              onPress={() =>
-                onChange({ ...draft, relatedLocationKey: "" })
-              }
-            >
-              <Text
-                style={[
-                  styles.filterChipText,
-                  !draft.relatedLocationKey &&
-                    styles.filterChipTextActive,
+            <Text style={styles.inputLabel}>Related Location</Text>
+            <View style={styles.relatedLocationList}>
+              <Pressable
+                style={({ hovered, pressed }: any) => [
+                  styles.filterChip,
+                  hovered && styles.filterChipHover,
+                  !draft.relatedLocationKey && styles.filterChipActive,
+                  hovered &&
+                    !draft.relatedLocationKey &&
+                    styles.filterChipActiveHover,
+                  pressed && styles.buttonPressed,
                 ]}
+                onPress={() =>
+                  onChange({ ...draft, relatedLocationKey: "" })
+                }
               >
-                None
-              </Text>
-            </Pressable>
-            {locations.slice(0, 20).map((location) => {
-              const locationKey = `${location.type}:${location.id}`;
-
-              return (
-                <Pressable
-                  key={locationKey}
+                <Text
                   style={[
-                    styles.filterChip,
-                    draft.relatedLocationKey === locationKey &&
-                      styles.filterChipActive,
+                    styles.filterChipText,
+                    !draft.relatedLocationKey &&
+                      styles.filterChipTextActive,
                   ]}
-                  onPress={() =>
-                    onChange({
-                      ...draft,
-                      relatedLocationKey: locationKey,
-                    })
-                  }
                 >
-                  <Text
-                    style={[
-                      styles.filterChipText,
+                  None
+                </Text>
+              </Pressable>
+              {locations.slice(0, 20).map((location) => {
+                const locationKey = `${location.type}:${location.id}`;
+
+                return (
+                  <Pressable
+                    key={locationKey}
+                    style={({ hovered, pressed }: any) => [
+                      styles.filterChip,
+                      hovered && styles.filterChipHover,
                       draft.relatedLocationKey === locationKey &&
-                        styles.filterChipTextActive,
+                        styles.filterChipActive,
+                      hovered &&
+                        draft.relatedLocationKey === locationKey &&
+                        styles.filterChipActiveHover,
+                      pressed && styles.buttonPressed,
                     ]}
+                    onPress={() =>
+                      onChange({
+                        ...draft,
+                        relatedLocationKey: locationKey,
+                      })
+                    }
                   >
-                    {location.name}
-                  </Text>
-                </Pressable>
-              );
-            })}
+                    <Text
+                      style={[
+                        styles.filterChipText,
+                        draft.relatedLocationKey === locationKey &&
+                          styles.filterChipTextActive,
+                      ]}
+                    >
+                      {location.name}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            <Text style={styles.inputLabel}>Message</Text>
+            <TextInput
+              multiline
+              onChangeText={(message) => onChange({ ...draft, message })}
+              placeholder="Write the notification details"
+              style={[styles.input, styles.notificationMessageInput]}
+              value={draft.message}
+            />
           </ScrollView>
 
-          <Text style={styles.inputLabel}>Message</Text>
-          <TextInput
-            multiline
-            onChangeText={(message) => onChange({ ...draft, message })}
-            placeholder="Write the notification details"
-            style={[styles.input, styles.notificationMessageInput]}
-            value={draft.message}
-          />
-
           <View style={styles.modalFooter}>
-            <Pressable style={styles.cancelButton} onPress={onClose}>
+            <Pressable
+              style={({ hovered, pressed }: any) => [
+                styles.cancelButton,
+                hovered && styles.cancelButtonHover,
+                pressed && styles.buttonPressed,
+              ]}
+              onPress={onClose}
+            >
               <Text style={styles.cancelButtonText}>Cancel</Text>
             </Pressable>
-            <Pressable style={styles.saveButton} onPress={onPublish}>
+            <Pressable
+              style={({ hovered, pressed }: any) => [
+                styles.saveButton,
+                hovered && styles.saveButtonHover,
+                pressed && styles.buttonPressed,
+              ]}
+              onPress={onPublish}
+            >
               <Text style={styles.saveButtonText}>Publish</Text>
             </Pressable>
           </View>
@@ -1171,850 +1594,39 @@ function NotificationComposerModal({
   );
 }
 
-const styles = StyleSheet.create({
-  webOnlyContainer: {
-    alignItems: "center",
-    flex: 1,
-    justifyContent: "center",
-    padding: 24,
-  },
-
-  webOnlyTitle: {
-    color: "#111827",
-    fontSize: 24,
-    fontWeight: "900",
-    marginBottom: 8,
-  },
-
-  webOnlyText: {
-    color: "#4b5563",
-    fontSize: 15,
-    textAlign: "center",
-  },
-
-  loginContainer: {
-    alignItems: "stretch",
-    backgroundColor: "#f3f4f6",
-    flex: 1,
-    flexDirection: "row",
-    minHeight: 560,
-  },
-
-  loginBrandPanel: {
-    backgroundColor: "#111827",
-    flex: 1,
-    justifyContent: "center",
-    padding: 48,
-  },
-
-  logoBox: {
-    alignItems: "center",
-    backgroundColor: "#f9fafb",
-    borderRadius: 8,
-    height: 84,
-    justifyContent: "center",
-    marginBottom: 24,
-    width: 84,
-  },
-
-  logoText: {
-    color: "#111827",
-    fontSize: 27,
-    fontWeight: "900",
-  },
-
-  loginBrandTitle: {
-    color: "white",
-    fontSize: 42,
-    fontWeight: "900",
-    lineHeight: 48,
-    maxWidth: 320,
-  },
-
-  loginBrandSubtitle: {
-    color: "#d1d5db",
-    fontSize: 16,
-    fontWeight: "600",
-    marginTop: 14,
-  },
-
-  loginPanel: {
-    alignItems: "stretch",
-    backgroundColor: "white",
-    flex: 1.1,
-    justifyContent: "center",
-    paddingHorizontal: 72,
-  },
-
-  adminIcon: {
-    alignItems: "center",
-    alignSelf: "center",
-    backgroundColor: "#f3f4f6",
-    borderRadius: 28,
-    height: 56,
-    justifyContent: "center",
-    marginBottom: 12,
-    width: 56,
-  },
-
-  adminIconText: {
-    color: "#111827",
-    fontSize: 24,
-    fontWeight: "900",
-  },
-
-  loginTitle: {
-    color: "#111827",
-    fontSize: 20,
-    fontWeight: "900",
-    textAlign: "center",
-  },
-
-  loginSubtitle: {
-    color: "#6b7280",
-    fontSize: 13,
-    marginBottom: 8,
-    marginTop: 6,
-    textAlign: "center",
-  },
-
-  prototypeCredentials: {
-    color: "#6b7280",
-    fontSize: 12,
-    fontWeight: "700",
-    marginBottom: 22,
-    textAlign: "center",
-  },
-
-  loginError: {
-    color: "#991b1b",
-    fontSize: 13,
-    fontWeight: "800",
-    marginBottom: 8,
-    textAlign: "center",
-  },
-
-  inputLabel: {
-    color: "#374151",
-    fontSize: 12,
-    fontWeight: "800",
-    marginBottom: 6,
-  },
-
-  input: {
-    backgroundColor: "white",
-    borderColor: "#d1d5db",
-    borderRadius: 8,
-    borderWidth: 1,
-    color: "#111827",
-    fontSize: 14,
-    marginBottom: 14,
-    minHeight: 42,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-  },
-
-  primaryButton: {
-    alignItems: "center",
-    backgroundColor: "#111827",
-    borderRadius: 8,
-    marginTop: 6,
-    paddingVertical: 13,
-  },
-
-  primaryButtonDisabled: {
-    opacity: 0.65,
-  },
-
-  primaryButtonText: {
-    color: "white",
-    fontSize: 14,
-    fontWeight: "900",
-  },
-
-  adminShell: {
-    backgroundColor: "#f3f4f6",
-    flex: 1,
-    flexDirection: "row",
-  },
-
-  sidebar: {
-    backgroundColor: "#111827",
-    padding: 24,
-    width: 260,
-  },
-
-  sidebarLogoRow: {
-    alignItems: "center",
-    flexDirection: "row",
-    marginBottom: 28,
-  },
-
-  sidebarLogo: {
-    alignItems: "center",
-    backgroundColor: "#f9fafb",
-    borderRadius: 8,
-    height: 46,
-    justifyContent: "center",
-    marginRight: 12,
-    width: 46,
-  },
-
-  sidebarLogoText: {
-    color: "#111827",
-    fontSize: 16,
-    fontWeight: "900",
-  },
-
-  sidebarBrand: {
-    color: "white",
-    fontSize: 18,
-    fontWeight: "900",
-  },
-
-  sidebarLabel: {
-    color: "#9ca3af",
-    fontSize: 12,
-    fontWeight: "900",
-    marginBottom: 10,
-    textTransform: "uppercase",
-  },
-
-  sidebarItem: {
-    color: "#e5e7eb",
-    fontSize: 15,
-    fontWeight: "800",
-    marginBottom: 16,
-  },
-
-  adminContent: {
-    flexGrow: 1,
-    padding: 24,
-  },
-
-  adminHeader: {
-    alignItems: "center",
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 18,
-  },
-
-  pageTitle: {
-    color: "#111827",
-    fontSize: 28,
-    fontWeight: "900",
-  },
-
-  pageSubtitle: {
-    color: "#6b7280",
-    fontSize: 14,
-    marginTop: 4,
-  },
-
-  saveMessage: {
-    color: "#374151",
-    fontSize: 13,
-    fontWeight: "800",
-    marginTop: 8,
-  },
-
-  adminUserCard: {
-    alignItems: "center",
-    backgroundColor: "white",
-    borderColor: "#e5e7eb",
-    borderRadius: 8,
-    borderWidth: 1,
-    flexDirection: "row",
-    gap: 10,
-    padding: 10,
-  },
-
-  userAvatar: {
-    alignItems: "center",
-    backgroundColor: "#f3f4f6",
-    borderRadius: 18,
-    height: 36,
-    justifyContent: "center",
-    width: 36,
-  },
-
-  userAvatarText: {
-    color: "#111827",
-    fontWeight: "900",
-  },
-
-  userName: {
-    color: "#111827",
-    fontSize: 13,
-    fontWeight: "900",
-  },
-
-  userRole: {
-    color: "#6b7280",
-    fontSize: 11,
-    fontWeight: "700",
-  },
-
-  logoutButton: {
-    backgroundColor: "#111827",
-    borderRadius: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-  },
-
-  resetButton: {
-    borderColor: "#d1d5db",
-    borderRadius: 8,
-    borderWidth: 1,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-
-  resetButtonText: {
-    color: "#374151",
-    fontSize: 12,
-    fontWeight: "900",
-  },
-
-  logoutButtonText: {
-    color: "white",
-    fontSize: 12,
-    fontWeight: "900",
-  },
-
-  statsGrid: {
-    flexDirection: "row",
-    gap: 12,
-    marginBottom: 18,
-  },
-
-  statCard: {
-    backgroundColor: "white",
-    borderColor: "#e5e7eb",
-    borderRadius: 8,
-    borderWidth: 1,
-    flex: 1,
-    padding: 16,
-  },
-
-  statValue: {
-    color: "#111827",
-    fontSize: 28,
-    fontWeight: "900",
-  },
-
-  statLabel: {
-    color: "#6b7280",
-    fontSize: 13,
-    fontWeight: "800",
-    marginTop: 4,
-  },
-
-  toolbar: {
-    backgroundColor: "white",
-    borderColor: "#e5e7eb",
-    borderRadius: 8,
-    borderWidth: 1,
-    marginBottom: 16,
-    padding: 14,
-  },
-
-  searchInput: {
-    backgroundColor: "#f9fafb",
-    borderColor: "#d1d5db",
-    borderRadius: 8,
-    borderWidth: 1,
-    color: "#111827",
-    fontSize: 14,
-    marginBottom: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-  },
-
-  filterList: {
-    gap: 8,
-  },
-
-  filterChip: {
-    borderColor: "#d1d5db",
-    borderRadius: 8,
-    borderWidth: 1,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-
-  filterChipActive: {
-    backgroundColor: "#111827",
-    borderColor: "#111827",
-  },
-
-  filterChipText: {
-    color: "#374151",
-    fontSize: 12,
-    fontWeight: "800",
-  },
-
-  filterChipTextActive: {
-    color: "white",
-  },
-
-  tableCard: {
-    backgroundColor: "white",
-    borderColor: "#e5e7eb",
-    borderRadius: 8,
-    borderWidth: 1,
-    overflow: "hidden",
-  },
-
-  tableRow: {
-    alignItems: "center",
-    borderBottomColor: "#e5e7eb",
-    borderBottomWidth: 1,
-    flexDirection: "row",
-    minHeight: 58,
-    paddingHorizontal: 14,
-  },
-
-  tableHeader: {
-    backgroundColor: "#f9fafb",
-    minHeight: 44,
-  },
-
-  loadingRow: {
-    alignItems: "center",
-    minHeight: 90,
-    justifyContent: "center",
-  },
-
-  loadingText: {
-    color: "#6b7280",
-    fontSize: 14,
-    fontWeight: "800",
-  },
-
-  tableCell: {
-    color: "#374151",
-    flex: 1,
-    fontSize: 13,
-    fontWeight: "700",
-  },
-
-  nameCell: {
-    flex: 2,
-  },
-
-  actionsCell: {
-    alignItems: "center",
-    flex: 1.2,
-    flexDirection: "row",
-    gap: 8,
-    justifyContent: "flex-end",
-  },
-
-  locationName: {
-    color: "#111827",
-    fontSize: 14,
-    fontWeight: "900",
-  },
-
-  locationDescription: {
-    color: "#6b7280",
-    fontSize: 12,
-    marginTop: 3,
-  },
-
-  secondaryActionButton: {
-    borderColor: "#d1d5db",
-    borderRadius: 8,
-    borderWidth: 1,
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-  },
-
-  secondaryActionText: {
-    color: "#374151",
-    fontSize: 12,
-    fontWeight: "900",
-  },
-
-  editButton: {
-    backgroundColor: "#111827",
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-
-  editButtonText: {
-    color: "white",
-    fontSize: 12,
-    fontWeight: "900",
-  },
-
-  modalOverlay: {
-    alignItems: "center",
-    backgroundColor: "rgba(17, 24, 39, 0.62)",
-    flex: 1,
-    justifyContent: "center",
-    padding: 24,
-  },
-
-  editModal: {
-    backgroundColor: "white",
-    borderRadius: 8,
-    maxWidth: 700,
-    padding: 16,
-    width: "100%",
-  },
-
-  roomsModal: {
-    backgroundColor: "white",
-    borderRadius: 8,
-    maxWidth: 640,
-    padding: 20,
-    width: "100%",
-  },
-
-  roomEditModal: {
-    backgroundColor: "white",
-    borderRadius: 8,
-    maxWidth: 640,
-    padding: 16,
-    width: "100%",
-  },
-
-  notificationComposerModal: {
-    backgroundColor: "white",
-    borderRadius: 8,
-    maxWidth: 620,
-    padding: 18,
-    width: "100%",
-  },
-
-  modalHeader: {
-    alignItems: "center",
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 16,
-  },
-
-  modalTitle: {
-    color: "#111827",
-    fontSize: 20,
-    fontWeight: "900",
-  },
-
-  modalSubtitle: {
-    color: "#6b7280",
-    fontSize: 13,
-    marginTop: 3,
-  },
-
-  modalClose: {
-    color: "#111827",
-    fontSize: 22,
-    fontWeight: "900",
-    paddingHorizontal: 8,
-  },
-
-  formGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 12,
-  },
-
-  editContent: {
-    flexDirection: "row",
-    gap: 18,
-  },
-
-  editPreviewColumn: {
-    width: 230,
-  },
-
-  editImagePreview: {
-    alignItems: "center",
-    backgroundColor: "#f3f4f6",
-    borderColor: "#d1d5db",
-    borderRadius: 8,
-    borderWidth: 1,
-    height: 152,
-    justifyContent: "center",
-    marginBottom: 12,
-  },
-
-  editImageText: {
-    color: "#6b7280",
-    fontSize: 14,
-    fontWeight: "900",
-  },
-
-  changePhotoButton: {
-    alignItems: "center",
-    borderColor: "#d1d5db",
-    borderRadius: 8,
-    borderWidth: 1,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-  },
-
-  changePhotoText: {
-    color: "#374151",
-    fontSize: 13,
-    fontWeight: "900",
-  },
-
-  photoHint: {
-    color: "#6b7280",
-    fontSize: 11,
-    fontWeight: "700",
-    marginTop: 8,
-    textAlign: "center",
-  },
-
-  editFormColumn: {
-    flex: 1,
-    minWidth: 0,
-  },
-
-  compactFormGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 10,
-  },
-
-  field: {
-    flexBasis: "48%",
-    flexGrow: 1,
-  },
-
-  compactField: {
-    flexBasis: "47%",
-    flexGrow: 1,
-  },
-
-  compactInput: {
-    marginBottom: 10,
-    minHeight: 36,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-  },
-
-  statusButtonGroup: {
-    flexBasis: "100%",
-    flexDirection: "row",
-    gap: 8,
-    marginBottom: 10,
-  },
-
-  statusButton: {
-    borderColor: "#d1d5db",
-    borderRadius: 8,
-    borderWidth: 1,
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-  },
-
-  statusButtonActive: {
-    backgroundColor: "#111827",
-    borderColor: "#111827",
-  },
-
-  statusButtonText: {
-    color: "#374151",
-    fontSize: 12,
-    fontWeight: "900",
-  },
-
-  statusButtonTextActive: {
-    color: "white",
-  },
-
-  notificationCategoryList: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-    marginBottom: 14,
-  },
-
-  relatedLocationList: {
-    gap: 8,
-    paddingBottom: 12,
-  },
-
-  notificationMessageInput: {
-    minHeight: 120,
-    textAlignVertical: "top",
-  },
-
-  textArea: {
-    minHeight: 82,
-    textAlignVertical: "top",
-  },
-
-  compactTextArea: {
-    marginBottom: 10,
-    minHeight: 62,
-    textAlignVertical: "top",
-  },
-
-  roomEditContent: {
-    flexDirection: "row",
-    gap: 18,
-  },
-
-  roomPhotoColumn: {
-    width: 280,
-  },
-
-  roomImagePreview: {
-    alignItems: "center",
-    backgroundColor: "#f3f4f6",
-    borderColor: "#d1d5db",
-    borderRadius: 8,
-    borderWidth: 1,
-    height: 150,
-    justifyContent: "center",
-    marginBottom: 12,
-  },
-
-  roomEditForm: {
-    flex: 1,
-    minWidth: 0,
-  },
-
-  roomDescriptionInput: {
-    minHeight: 110,
-    textAlignVertical: "top",
-  },
-
-  manageRoomsRow: {
-    alignItems: "center",
-    borderColor: "#d1d5db",
-    borderRadius: 8,
-    borderWidth: 1,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginTop: 16,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-  },
-
-  manageRoomsText: {
-    color: "#111827",
-    fontSize: 13,
-    fontWeight: "900",
-  },
-
-  manageRoomsArrow: {
-    color: "#4b5563",
-    fontSize: 16,
-    fontWeight: "900",
-  },
-
-  modalFooter: {
-    flexDirection: "row",
-    gap: 10,
-    justifyContent: "flex-end",
-    marginTop: 8,
-  },
-
-  cancelButton: {
-    borderColor: "#d1d5db",
-    borderRadius: 8,
-    borderWidth: 1,
-    paddingHorizontal: 22,
-    paddingVertical: 11,
-  },
-
-  cancelButtonText: {
-    color: "#374151",
-    fontSize: 13,
-    fontWeight: "900",
-  },
-
-  saveButton: {
-    alignItems: "center",
-    backgroundColor: "#111827",
-    borderRadius: 8,
-    paddingHorizontal: 22,
-    paddingVertical: 11,
-  },
-
-  saveButtonText: {
-    color: "white",
-    fontSize: 13,
-    fontWeight: "900",
-  },
-
-  floorGroup: {
-    borderColor: "#e5e7eb",
-    borderRadius: 8,
-    borderWidth: 1,
-    marginBottom: 12,
-    overflow: "hidden",
-  },
-
-  floorTitle: {
-    backgroundColor: "#f9fafb",
-    color: "#111827",
-    fontSize: 14,
-    fontWeight: "900",
-    padding: 12,
-  },
-
-  roomRow: {
-    alignItems: "center",
-    borderTopColor: "#e5e7eb",
-    borderTopWidth: 1,
-    flexDirection: "row",
-    padding: 12,
-  },
-
-  roomNumber: {
-    color: "#111827",
-    flex: 1,
-    fontSize: 13,
-    fontWeight: "900",
-  },
-
-  roomType: {
-    color: "#6b7280",
-    flex: 1,
-    fontSize: 13,
-    fontWeight: "700",
-    textTransform: "capitalize",
-  },
-
-  smallEditButton: {
-    borderColor: "#d1d5db",
-    borderRadius: 8,
-    borderWidth: 1,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-  },
-
-  smallEditText: {
-    color: "#374151",
-    fontSize: 12,
-    fontWeight: "900",
-  },
-
-  emptyRooms: {
-    backgroundColor: "#f9fafb",
-    borderRadius: 8,
-    padding: 18,
-  },
-
-  emptyRoomsTitle: {
-    color: "#111827",
-    fontSize: 16,
-    fontWeight: "900",
-  },
-
-  emptyRoomsText: {
-    color: "#6b7280",
-    fontSize: 13,
-    lineHeight: 19,
-    marginTop: 6,
-  },
-});
+function SuccessDialog({
+  state,
+  onClose,
+}: {
+  state: SuccessDialogState | null;
+  onClose: () => void;
+}) {
+  const { width } = useWindowDimensions();
+  const isNarrow = width < 720;
+
+  return (
+    <Modal transparent visible={Boolean(state)} animationType="fade">
+      <View style={[styles.modalOverlay, isNarrow && styles.modalOverlayNarrow]}>
+        {state ? (
+          <View style={[styles.successDialog, isNarrow && styles.modalNarrow]}>
+            <View style={styles.successIcon}>
+              <Text style={styles.successIconText}>✓</Text>
+            </View>
+            <Text style={styles.successTitle}>{state.title}</Text>
+            <Text style={styles.successMessage}>{state.message}</Text>
+            <Pressable
+              style={({ hovered, pressed }: any) => [
+                styles.successButton,
+                hovered && styles.saveButtonHover,
+                pressed && styles.buttonPressed,
+              ]}
+              onPress={onClose}
+            >
+              <Text style={styles.successButtonText}>Done</Text>
+            </Pressable>
+          </View>
+        ) : null}
+      </View>
+    </Modal>
+  );
+}

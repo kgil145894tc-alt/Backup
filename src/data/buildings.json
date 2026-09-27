@@ -55,7 +55,7 @@
         "type": "building",
         "category": "Building",
         "floors": 3,
-        "description": "Three-storey academic building with B1-101 to B1-104 on the First Floor; B1-205 to B1-208 on the Second Floor; and B1-309, B1-311, and B1-312 on the Third Floor."
+        "description": "Three-storey academic building with B1-101 to B1-104 on the First Floor; B1-205 to B1-208 on the Second Floor; and B1-309 to B1-312 on the Third Floor."
       },
       "geometry": {
         "type": "Polygon",

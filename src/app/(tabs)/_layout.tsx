@@ -1,5 +1,4 @@
-import { Tabs } from "expo-router";
-import { router, useFocusEffect } from "expo-router";
+import { router, Tabs, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import { Pressable, StyleSheet } from "react-native";
 
@@ -32,39 +31,38 @@ export default function TabLayout() {
       let hasStoredSession = false;
       let unsubscribe = () => {};
 
-      void Promise.all([
-        getAppAccessMode(),
-        getStoredUserSession(),
-      ]).then(([mode, storedSession]) => {
-        if (!isActive) {
-          return;
-        }
-
-        localMode = mode;
-        hasStoredSession = Boolean(storedSession);
-        setAccessMode(mode);
-
-        unsubscribe = watchUserSession((session) => {
+      void Promise.all([getAppAccessMode(), getStoredUserSession()]).then(
+        ([mode, storedSession]) => {
           if (!isActive) {
             return;
           }
 
-          if (session) {
-            setAccessMode("user");
-            void setStoredUserSession(session);
-            void setAppAccessMode("user");
-            return;
-          }
+          localMode = mode;
+          hasStoredSession = Boolean(storedSession);
+          setAccessMode(mode);
 
-          if (localMode === "user" && hasStoredSession) {
-            return;
-          }
+          unsubscribe = watchUserSession((session) => {
+            if (!isActive) {
+              return;
+            }
 
-          setAccessMode("guest");
-          void clearStoredUserSession();
-          void setAppAccessMode("guest");
-        });
-      });
+            if (session) {
+              setAccessMode("user");
+              void setStoredUserSession(session);
+              void setAppAccessMode("user");
+              return;
+            }
+
+            if (localMode === "user" && hasStoredSession) {
+              return;
+            }
+
+            setAccessMode("guest");
+            void clearStoredUserSession();
+            void setAppAccessMode("guest");
+          });
+        },
+      );
 
       return () => {
         isActive = false;
@@ -141,13 +139,6 @@ export default function TabLayout() {
           }}
         />
 
-        <Tabs.Screen
-          name="location-details"
-          options={{
-            href: null,
-            title: "Location Details",
-          }}
-        />
       </Tabs>
 
       <LimitedAccessModal

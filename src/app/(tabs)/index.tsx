@@ -1,8 +1,24 @@
 import { Image } from "expo-image";
 import { router, useFocusEffect } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { type ComponentProps, type ComponentType, useCallback, useRef, useState } from "react";
-import { Keyboard, Pressable, ScrollView, Text, View } from "react-native";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ComponentProps,
+  type ComponentType,
+} from "react";
+import {
+  Animated,
+  Easing,
+  Keyboard,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import LimitedAccessModal from "@/components/LimitedAccessModal";
@@ -14,20 +30,23 @@ import {
   type OfficialNotificationItem,
   type OfficialRecentItem,
 } from "@/components/OfficialDesign";
-import AcademicIcon from "../../../assets/design/icons/academic.svg";
-import Arrow from "../../../assets/design/icons/proceed-arrow.svg";
+import { navigateToTab } from "@/utils/navigation";
 import Background from "../../../assets/design/backgrounds/thirdBg.svg";
-import Bell from "../../../assets/design/icons/notification.svg";
+import AcademicIcon from "../../../assets/design/icons/academic.svg";
 import CampusMap from "../../../assets/design/icons/campusMap.svg";
 import FacilitiesIcon from "../../../assets/design/icons/facilities.svg";
 import FoodIcon from "../../../assets/design/icons/food.svg";
 import MoreIcon from "../../../assets/design/icons/more.svg";
+import Bell from "../../../assets/design/icons/notification.svg";
 import OfficesIcon from "../../../assets/design/icons/offices.svg";
+import Arrow from "../../../assets/design/icons/proceed-arrow.svg";
 import Search from "../../../assets/design/icons/seacrch.svg";
 import ServicesIcon from "../../../assets/design/icons/services.svg";
 import { type CampusNotification } from "../../data/notifications";
 import { loadCampusData } from "../../services/campusDataStore";
-import { loadNotifications } from "../../services/notificationStore";
+import { subscribeToNotifications } from "../../services/notificationStore";
+import { styles } from "../../styles/official/homeScreen.styles";
+import type { AdminLocation } from "../../utils/adminLocations";
 import {
   getAppAccessMode,
   getStoredUserSession,
@@ -35,29 +54,26 @@ import {
   type AppAccessMode,
   type StoredUserSession,
 } from "../../utils/appSession";
-import type { AdminLocation } from "../../utils/adminLocations";
-import { getCurrentHistory, type GuestHistoryItem } from "../../utils/guestHistory";
-import { getReadNotificationIds, markNotificationRead } from "../../utils/notificationReadState";
-import { navigateToTab } from "@/utils/navigation";
-import { styles } from "../../styles/official/homeScreen.styles";
+import {
+  getCurrentHistory,
+  type GuestHistoryItem,
+} from "../../utils/guestHistory";
+import {
+  getReadNotificationIds,
+  markNotificationRead,
+} from "../../utils/notificationReadState";
 
 const universitySeal = require("../../../assets/design/logos/UM.png");
 
 type CategoryShortcut = {
   Icon: ComponentType<ComponentProps<typeof AcademicIcon>>;
+  color: string;
+  count: number;
+  isMore?: boolean;
   light?: boolean;
-  style: "academic" | "offices" | "pink" | "cream";
   title: string;
+  mapCategory: string;
 };
-
-const categoryShortcuts: CategoryShortcut[] = [
-  { title: "Academic", Icon: AcademicIcon, style: "academic", light: true },
-  { title: "Offices", Icon: OfficesIcon, style: "offices" },
-  { title: "Facilities", Icon: FacilitiesIcon, style: "pink" },
-  { title: "Food", Icon: FoodIcon, style: "cream" },
-  { title: "Services", Icon: ServicesIcon, style: "pink" },
-  { title: "More", Icon: MoreIcon, style: "cream" },
-];
 
 const locationImages = {
   academic: require("../../../assets/design/locations/category-academic.png"),
@@ -69,6 +85,59 @@ const locationImages = {
   library: require("../../../assets/design/locations/library.png"),
   newBuilding: require("../../../assets/design/locations/new-building.png"),
 };
+
+const categoryPresentation = {
+  Building: {
+    color: "#AF2532",
+    Icon: MoreIcon,
+    light: true,
+  },
+  Facility: {
+    color: "#FAE7E9",
+    Icon: FacilitiesIcon,
+  },
+  Faculty: {
+    color: "#F0E7FA",
+    Icon: AcademicIcon,
+  },
+  Food: {
+    color: "#FAF2DD",
+    Icon: FoodIcon,
+  },
+  Laboratory: {
+    color: "#E6F1FF",
+    Icon: AcademicIcon,
+  },
+  Office: {
+    color: "#FED257",
+    Icon: OfficesIcon,
+  },
+  Room: {
+    color: "#AA2A37",
+    Icon: AcademicIcon,
+    light: true,
+  },
+  Security: {
+    color: "#E8EEF1",
+    Icon: ServicesIcon,
+  },
+};
+
+const fallbackCategoryPresentation = {
+  color: "#FAF2DD",
+  Icon: MoreIcon,
+};
+
+const preferredCategoryOrder = [
+  "Building",
+  "Room",
+  "Laboratory",
+  "Faculty",
+  "Office",
+  "Facility",
+  "Food",
+  "Security",
+];
 
 function formatViewedAt(viewedAt: number) {
   const elapsedMs = Date.now() - viewedAt;
@@ -90,19 +159,25 @@ function formatViewedAt(viewedAt: number) {
 
 function getLocationImage(location?: AdminLocation, item?: GuestHistoryItem) {
   const name = `${location?.name ?? item?.name ?? ""}`.toLowerCase();
-  const category = `${location?.category ?? item?.category ?? ""}`.toLowerCase();
+  const category =
+    `${location?.category ?? item?.category ?? ""}`.toLowerCase();
 
   if (name.includes("cafeteria")) return locationImages.cafeteria;
   if (name.includes("clinic")) return locationImages.clinic;
   if (name.includes("library")) return locationImages.library;
-  if (name.includes("new") || name.includes("building 2")) return locationImages.newBuilding;
+  if (name.includes("new") || name.includes("building 2"))
+    return locationImages.newBuilding;
   if (category.includes("academic")) return locationImages.academic;
-  if (category.includes("office") || category.includes("admin")) return locationImages.admin;
+  if (category.includes("office") || category.includes("admin"))
+    return locationImages.admin;
   if (category.includes("facilit")) return locationImages.facilities;
   return locationImages.default;
 }
 
-function toOfficialNotification(notification: CampusNotification): OfficialNotificationItem {
+function toOfficialNotification(
+  notification: CampusNotification,
+  readNotificationIds?: Set<string>,
+): OfficialNotificationItem {
   return {
     id: notification.id,
     title: notification.title,
@@ -110,6 +185,9 @@ function toOfficialNotification(notification: CampusNotification): OfficialNotif
     time: notification.timeLabel,
     buildingName: notification.locationName,
     locationName: notification.locationSubtitle,
+    unread: readNotificationIds
+      ? !readNotificationIds.has(notification.id)
+      : false,
   };
 }
 
@@ -117,18 +195,94 @@ export default function Home() {
   const scrollRef = useRef<ScrollView>(null);
   const openAllAfterClose = useRef(false);
   const pendingNotification = useRef<CampusNotification | null>(null);
+  const mapPulsePrimary = useRef(new Animated.Value(0)).current;
+  const mapPulseSecondary = useRef(new Animated.Value(0)).current;
+  const mapPulseTertiary = useRef(new Animated.Value(0)).current;
   const [recentItems, setRecentItems] = useState<GuestHistoryItem[]>([]);
   const [adminLocations, setAdminLocations] = useState<AdminLocation[]>([]);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
-  const [selectedNotification, setSelectedNotification] = useState<CampusNotification>();
+  const [selectedNotification, setSelectedNotification] =
+    useState<CampusNotification>();
   const [notifications, setNotifications] = useState<CampusNotification[]>([]);
-  const [readNotificationIds, setReadNotificationIds] = useState<Set<string>>(new Set());
+  const [readNotificationIds, setReadNotificationIds] = useState<Set<string>>(
+    new Set(),
+  );
   const [accessMode, setAccessMode] = useState<AppAccessMode>("guest");
-  const [userSession, setUserSession] = useState<StoredUserSession | null>(null);
+  const [userSession, setUserSession] = useState<StoredUserSession | null>(
+    null,
+  );
   const [isLimitedAccessOpen, setIsLimitedAccessOpen] = useState(false);
   const isGuest = isGuestMode(accessMode);
   const displayName =
-    userSession?.displayName?.split(" ")[0] ?? userSession?.email?.split("@")[0] ?? "User";
+    userSession?.displayName?.split(" ")[0] ??
+    userSession?.email?.split("@")[0] ??
+    "User";
+  const unreadNotificationCount = notifications.filter(
+    (notification) => !readNotificationIds.has(notification.id),
+  ).length;
+
+  useEffect(() => {
+    const createPulse = (pulse: Animated.Value) =>
+      Animated.sequence([
+        Animated.timing(pulse, {
+          toValue: 1,
+          duration: 1500,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+          isInteraction: false,
+        }),
+        Animated.timing(pulse, {
+          toValue: 0,
+          duration: 0,
+          useNativeDriver: true,
+          isInteraction: false,
+        }),
+      ]);
+
+    const animation = Animated.loop(
+      Animated.stagger(420, [
+        createPulse(mapPulsePrimary),
+        createPulse(mapPulseSecondary),
+        createPulse(mapPulseTertiary),
+      ]),
+    );
+
+    animation.start();
+
+    return () => {
+      animation.stop();
+    };
+  }, [mapPulsePrimary, mapPulseSecondary, mapPulseTertiary]);
+
+  const createMapPulseStyle = useCallback(
+    (pulse: Animated.Value) => ({
+      opacity: pulse.interpolate({
+        inputRange: [0, 1],
+        outputRange: [0.7, 0],
+      }),
+      transform: [
+        {
+          scale: pulse.interpolate({
+            inputRange: [0, 1],
+            outputRange: [0.72, 1.85],
+          }),
+        },
+      ],
+    }),
+    [],
+  );
+  const mapPulsePrimaryStyle = useMemo(
+    () => createMapPulseStyle(mapPulsePrimary),
+    [createMapPulseStyle, mapPulsePrimary],
+  );
+  const mapPulseSecondaryStyle = useMemo(
+    () => createMapPulseStyle(mapPulseSecondary),
+    [createMapPulseStyle, mapPulseSecondary],
+  );
+  const mapPulseTertiaryStyle = useMemo(
+    () => createMapPulseStyle(mapPulseTertiary),
+    [createMapPulseStyle, mapPulseTertiary],
+  );
 
   useFocusEffect(
     useCallback(() => {
@@ -139,31 +293,45 @@ export default function Home() {
         loadCampusData(),
         getAppAccessMode(),
         getStoredUserSession(),
-        loadNotifications(),
         getReadNotificationIds(),
-      ]).then(([history, campusData, mode, session, nextNotifications, nextReadIds]) => {
-        if (!isActive) return;
-        setAccessMode(mode);
-        setUserSession(session);
-        setNotifications(nextNotifications);
-        setReadNotificationIds(nextReadIds);
+      ]).then(
+        ([
+          history,
+          campusData,
+          mode,
+          session,
+          nextReadIds,
+        ]) => {
+          if (!isActive) return;
+          setAccessMode(mode);
+          setUserSession(session);
+          setReadNotificationIds(nextReadIds);
 
-        const visibleLocationKeys = new Set(
-          campusData.visibleLocations.map((location) => `${location.type}:${location.id}`),
-        );
-        setRecentItems(
-          history
-            .filter((item) => visibleLocationKeys.has(`${item.featureType}:${item.featureId}`))
-            .slice(0, 6),
-        );
-        setAdminLocations(campusData.visibleLocations);
-      });
+          const visibleLocationKeys = new Set(
+            campusData.visibleLocations.map(
+              (location) => `${location.type}:${location.id}`,
+            ),
+          );
+          setRecentItems(
+            history
+              .filter((item) =>
+                visibleLocationKeys.has(
+                  `${item.featureType}:${item.featureId}`,
+                ),
+              )
+              .slice(0, 6),
+          );
+          setAdminLocations(campusData.visibleLocations);
+        },
+      );
 
       return () => {
         isActive = false;
       };
     }, []),
   );
+
+  useEffect(() => subscribeToNotifications(setNotifications), []);
 
   const openLimitedAccess = () => setIsLimitedAccessOpen(true);
 
@@ -198,7 +366,9 @@ export default function Home() {
     }
   }, []);
 
-  const openLockedRoute = (pathname: "/(tabs)/search" | "/(tabs)/categories") => {
+  const openLockedRoute = (
+    pathname: "/(tabs)/search" | "/(tabs)/categories",
+  ) => {
     if (isGuest) {
       openLimitedAccess();
       return;
@@ -208,7 +378,8 @@ export default function Home() {
 
   const getRecentDisplayItem = (item: GuestHistoryItem) =>
     adminLocations.find(
-      (location) => location.id === item.featureId && location.type === item.featureType,
+      (location) =>
+        location.id === item.featureId && location.type === item.featureType,
     );
 
   const recentCards: OfficialRecentItem[] = recentItems.map((item) => ({
@@ -218,6 +389,54 @@ export default function Home() {
     time: formatViewedAt(item.viewedAt),
   }));
 
+  const categoryShortcuts = useMemo<CategoryShortcut[]>(() => {
+    const counts = new Map<string, number>();
+
+    adminLocations.forEach((location) => {
+      counts.set(location.category, (counts.get(location.category) ?? 0) + 1);
+    });
+
+    const topCategories = [...counts.keys()]
+      .sort((first, second) => {
+        const firstIndex = preferredCategoryOrder.indexOf(first);
+        const secondIndex = preferredCategoryOrder.indexOf(second);
+
+        if (firstIndex !== -1 || secondIndex !== -1) {
+          return (
+            (firstIndex === -1 ? Number.MAX_SAFE_INTEGER : firstIndex) -
+            (secondIndex === -1 ? Number.MAX_SAFE_INTEGER : secondIndex)
+          );
+        }
+
+        return first.localeCompare(second);
+      })
+      .slice(0, 5)
+      .map((category) => {
+        const presentation =
+          categoryPresentation[category as keyof typeof categoryPresentation] ??
+          fallbackCategoryPresentation;
+
+        return {
+          title: category,
+          count: counts.get(category) ?? 0,
+          mapCategory: category,
+          ...presentation,
+        };
+      });
+
+    return [
+      ...topCategories,
+      {
+        title: "More",
+        count: counts.size,
+        mapCategory: "",
+        Icon: MoreIcon,
+        color: "#FAF2DD",
+        isMore: true,
+      },
+    ];
+  }, [adminLocations]);
+
   const openRecentItem = (item: OfficialRecentItem) => {
     const historyItem = recentItems.find(
       (recent) => `${recent.featureType}-${recent.featureId}` === item.id,
@@ -226,11 +445,28 @@ export default function Home() {
     if (!historyItem) return;
 
     router.push({
-      pathname: "/(tabs)/location-details",
+      pathname: "/(tabs)/map",
       params: {
         featureId: historyItem.featureId,
         featureType: historyItem.featureType,
       },
+    });
+  };
+
+  const openCategoryOnMap = (shortcut: CategoryShortcut) => {
+    if (isGuest) {
+      openLimitedAccess();
+      return;
+    }
+
+    if (shortcut.isMore) {
+      router.navigate("/(tabs)/categories");
+      return;
+    }
+
+    router.navigate({
+      pathname: "/(tabs)/map",
+      params: { category: shortcut.mapCategory },
     });
   };
 
@@ -260,7 +496,11 @@ export default function Home() {
             accessibilityLabel="University of Mindanao seal"
           />
           <View style={styles.brand}>
-            <Text style={styles.brandTitle} numberOfLines={1} adjustsFontSizeToFit>
+            <Text
+              style={styles.brandTitle}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+            >
               UMVC
               <Text style={styles.gold}>FIND</Text>
             </Text>
@@ -272,7 +512,14 @@ export default function Home() {
             style={styles.iconButton}
             onPress={openNotifications}
           >
-            <Bell width={28} height={28} accessible={false} />
+            <Bell width={32} height={32} accessible={false} />
+            {!isGuest && unreadNotificationCount > 0 ? (
+              <View style={styles.notificationBadge}>
+                <Text style={styles.notificationBadgeText}>
+                  {unreadNotificationCount > 9 ? "9+" : unreadNotificationCount}
+                </Text>
+              </View>
+            ) : null}
           </Pressable>
         </View>
 
@@ -296,21 +543,66 @@ export default function Home() {
             <Text style={styles.input}>Search a building or location...</Text>
           </Pressable>
 
-          <View style={styles.sectionHeading}>
-            <Text style={styles.sectionTitle}>Recently Viewed</Text>
-            {recentItems.length > 0 ? (
-              <Pressable
-                accessibilityRole="button"
-                style={styles.seeAll}
-                onPress={() => openLockedRoute("/(tabs)/search")}
-              >
-                <Text style={styles.link}>See all</Text>
-                <Arrow width={14} height={16} color="#AF2532" accessible={false} />
-              </Pressable>
-            ) : null}
-          </View>
+          {isGuest ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Explore Campus Map"
+              onPress={() => router.navigate("/(tabs)/map")}
+              style={({ pressed }) => [
+                styles.mapButton,
+                styles.guestMapButton,
+                pressed && styles.pressed,
+              ]}
+            >
+              <View pointerEvents="none" style={styles.mapPulseIconWrap}>
+                <Animated.View
+                  style={[styles.mapPulseCircle, mapPulsePrimaryStyle]}
+                />
+                <Animated.View
+                  style={[styles.mapPulseCircle, mapPulseSecondaryStyle]}
+                />
+                <Animated.View
+                  style={[styles.mapPulseCircle, mapPulseTertiaryStyle]}
+                />
+                <View style={styles.mapPulseCore}>
+                  <CampusMap width={30} height={30} accessible={false} />
+                </View>
+              </View>
+              <View style={styles.mapCopy}>
+                <Text style={styles.mapTitle}>Explore Campus Map</Text>
+                <Text style={styles.mapSubtitle}>
+                  View the interactive map and start exploring!
+                </Text>
+              </View>
+              <Arrow width={21} height={25} color="white" accessible={false} />
+            </Pressable>
+          ) : (
+            <>
+              <View style={styles.sectionHeading}>
+                <Text style={styles.sectionTitle}>Recently Viewed</Text>
+                {recentItems.length > 0 ? (
+                  <Pressable
+                    accessibilityRole="button"
+                    style={styles.seeAll}
+                    onPress={() => openLockedRoute("/(tabs)/search")}
+                  >
+                    <Text style={styles.link}>See all</Text>
+                    <Arrow
+                      width={14}
+                      height={16}
+                      color="#AF2532"
+                      accessible={false}
+                    />
+                  </Pressable>
+                ) : null}
+              </View>
 
-          <OfficialRecentLocations items={recentCards} onSelect={openRecentItem} />
+              <OfficialRecentLocations
+                items={recentCards}
+                onSelect={openRecentItem}
+              />
+            </>
+          )}
 
           <View>
             <View style={styles.sectionHeading}>
@@ -318,46 +610,83 @@ export default function Home() {
               <Text style={styles.browse}>Browse by category</Text>
             </View>
             <View style={styles.grid}>
-              {categoryShortcuts.map(({ title, Icon, style, light }) => (
-                <Pressable
-                  key={title}
-                  accessibilityRole="button"
-                  accessibilityLabel={title}
-                  onPress={() => openLockedRoute("/(tabs)/categories")}
-                  style={({ pressed }) => [
-                    styles.tile,
-                    styles[style],
-                    pressed && styles.pressed,
-                  ]}
-                >
-                  <Icon width={30} height={30} accessible={false} />
-                  <Text
-                    style={[styles.tileText, light && styles.white]}
-                    numberOfLines={1}
-                    adjustsFontSizeToFit
+              {categoryShortcuts.map((shortcut) => {
+                const { title, Icon, color, count, isMore, light } = shortcut;
+
+                return (
+                  <Pressable
+                    key={title}
+                    accessibilityRole="button"
+                    accessibilityLabel={
+                      isMore
+                        ? "More categories"
+                        : `${title}, ${count} locations`
+                    }
+                    onPress={() => openCategoryOnMap(shortcut)}
+                    style={({ pressed }) => [
+                      styles.tile,
+                      { backgroundColor: color },
+                      pressed && styles.pressed,
+                    ]}
                   >
-                    {title}
-                  </Text>
-                </Pressable>
-              ))}
+                    <Icon width={30} height={30} accessible={false} />
+                    <View style={styles.tileCopy}>
+                      <Text
+                        style={[styles.tileText, light && styles.white]}
+                        numberOfLines={1}
+                        adjustsFontSizeToFit
+                      >
+                        {title}
+                      </Text>
+                      <Text
+                        style={[styles.tileCount, light && styles.white]}
+                        numberOfLines={1}
+                        adjustsFontSizeToFit
+                      >
+                        {isMore
+                          ? "View all"
+                          : `${count} ${count === 1 ? "location" : "locations"}`}
+                      </Text>
+                    </View>
+                  </Pressable>
+                );
+              })}
             </View>
           </View>
 
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Explore Campus Map"
-            onPress={() => router.navigate("/(tabs)/map")}
-            style={({ pressed }) => [styles.mapButton, pressed && styles.pressed]}
-          >
-            <CampusMap width={43} height={43} accessible={false} />
-            <View style={styles.mapCopy}>
-              <Text style={styles.mapTitle}>Explore Campus Map</Text>
-              <Text style={styles.mapSubtitle}>
-                View the interactive map and start exploring!
-              </Text>
-            </View>
-            <Arrow width={21} height={25} color="white" accessible={false} />
-          </Pressable>
+          {!isGuest ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Explore Campus Map"
+              onPress={() => router.navigate("/(tabs)/map")}
+              style={({ pressed }) => [
+                styles.mapButton,
+                pressed && styles.pressed,
+              ]}
+            >
+              <View pointerEvents="none" style={styles.mapPulseIconWrap}>
+                <Animated.View
+                  style={[styles.mapPulseCircle, mapPulsePrimaryStyle]}
+                />
+                <Animated.View
+                  style={[styles.mapPulseCircle, mapPulseSecondaryStyle]}
+                />
+                <Animated.View
+                  style={[styles.mapPulseCircle, mapPulseTertiaryStyle]}
+                />
+                <View style={styles.mapPulseCore}>
+                  <CampusMap width={30} height={30} accessible={false} />
+                </View>
+              </View>
+              <View style={styles.mapCopy}>
+                <Text style={styles.mapTitle}>Explore Campus Map</Text>
+                <Text style={styles.mapSubtitle}>
+                  View the interactive map and start exploring!
+                </Text>
+              </View>
+              <Arrow width={21} height={25} color="white" accessible={false} />
+            </Pressable>
+          ) : null}
         </ScrollView>
 
         <OfficialBottomNavigation activeItem="Home" onSelect={navigate} />
@@ -366,9 +695,15 @@ export default function Home() {
       <OfficialNotificationSheet
         visible={isNotificationsOpen}
         onClose={() => setIsNotificationsOpen(false)}
-        items={notifications.slice(0, 4).map(toOfficialNotification)}
+        items={notifications
+          .slice(0, 4)
+          .map((notification) =>
+            toOfficialNotification(notification, readNotificationIds),
+          )}
         onSelect={(item) => {
-          const notification = notifications.find((candidate) => candidate.id === item.id);
+          const notification = notifications.find(
+            (candidate) => candidate.id === item.id,
+          );
           if (notification) {
             pendingNotification.current = notification;
           }
@@ -383,7 +718,10 @@ export default function Home() {
 
       {selectedNotification ? (
         <OfficialNotificationDetailSheet
-          item={toOfficialNotification(selectedNotification)}
+          item={toOfficialNotification(
+            selectedNotification,
+            readNotificationIds,
+          )}
           onClosed={() => {
             setSelectedNotification(undefined);
             setIsNotificationsOpen(true);

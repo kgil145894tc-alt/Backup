@@ -27,7 +27,9 @@ export default function OfficialPage({
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Go back"
-            onPress={() => (router.canGoBack() ? router.back() : router.replace("/(tabs)"))}
+            onPress={() =>
+              router.canGoBack() ? router.back() : router.replace("/(tabs)")
+            }
             style={styles.backButton}
           >
             <BackArrow width={32} height={32} accessible={false} />
@@ -37,7 +39,10 @@ export default function OfficialPage({
             {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
           </View>
         </View>
-        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <ScrollView
+          contentContainerStyle={styles.content}
+          showsVerticalScrollIndicator={false}
+        >
           {children}
         </ScrollView>
       </SafeAreaView>

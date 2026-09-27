@@ -1,5 +1,6 @@
 // Used by src/screens/searchScreen.jsx
 import { StyleSheet } from "react-native";
+import { rf, rs } from "@/utils/responsive";
 
 export const styles = StyleSheet.create({
   // Screen Background and Safe Area
@@ -7,11 +8,11 @@ export const styles = StyleSheet.create({
   background: StyleSheet.absoluteFill,
   safe: { flex: 1 },
   // Header: Back Button and Title
-  header: { paddingHorizontal: 17, paddingTop: 12, paddingBottom: 10 },
+  header: { paddingHorizontal: rs(17, 12, 20), paddingTop: rs(12, 8, 14), paddingBottom: rs(10, 8, 12) },
   titleRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
+    gap: rs(12, 8, 14),
     marginBottom: 8,
   },
   backButton: {
@@ -20,15 +21,15 @@ export const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  title: { fontSize: 20, fontWeight: "700", color: "white" },
+  title: { fontSize: rf(20, 18, 22), fontWeight: "700", color: "white" },
   // Search Input Size and Font
   input: {
-    minHeight: 64,
-    borderRadius: 20,
+    minHeight: rs(64, 52, 66),
+    borderRadius: rs(20, 14, 22),
     backgroundColor: "white",
-    paddingHorizontal: 24,
-    paddingVertical: 14,
-    fontSize: 20,
+    paddingHorizontal: rs(24, 16, 26),
+    paddingVertical: rs(14, 10, 15),
+    fontSize: rf(20, 16, 21),
     color: "#3C4147",
   },
   inputFont: { fontFamily: "SearchRegular" },
@@ -36,7 +37,7 @@ export const styles = StyleSheet.create({
   list: { flex: 1 },
   // Fixed Recent Searches Heading Container
   headingContainer: {
-    paddingHorizontal: 24,
+    paddingHorizontal: rs(24, 16, 28),
     width: "100%",
     maxWidth: 600,
     alignSelf: "center",
@@ -44,19 +45,19 @@ export const styles = StyleSheet.create({
   },
   // Scrollable Card List Padding
   content: {
-    paddingHorizontal: 24,
-    paddingBottom: 24,
+    paddingHorizontal: rs(24, 16, 28),
+    paddingBottom: rs(24, 18, 28),
     width: "100%",
     maxWidth: 600,
     alignSelf: "center",
   },
   // Recent Searches and Search Results Text
   heading: {
-    fontSize: 24,
+    fontSize: rf(24, 20, 25),
     color: "#3C4147",
-    marginTop: 18,
-    marginBottom: 16,
-    marginLeft: 10,
+    marginTop: rs(18, 14, 20),
+    marginBottom: rs(16, 12, 18),
+    marginLeft: rs(10, 0, 12),
     fontWeight: "700",
   },
   headingFont: { fontFamily: "SearchBold", fontWeight: "normal" },
@@ -65,7 +66,7 @@ export const styles = StyleSheet.create({
   // No Results Message
   empty: {
     color: "#6C757D",
-    fontSize: 16,
+    fontSize: rf(16, 14, 17),
     textAlign: "center",
     paddingVertical: 30,
   },

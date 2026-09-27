@@ -168,10 +168,33 @@ function directoryRooms(
   }));
 }
 
+function comfortRoomFloor(floorNumber: number): BuildingRoom[] {
+  const floorLabel =
+    ["", "First Floor", "Second Floor", "Third Floor"][floorNumber] ??
+    `Floor ${floorNumber}`;
+  const roomNames = [
+    "Female Restroom",
+    "Accessible Restroom",
+    "Male Restroom",
+  ];
+
+  return roomNames.map((name) => ({
+    id: `cr1-building-${name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-floor-${floorNumber}`,
+    name,
+    type: "facility",
+    category: "Facility",
+    buildingId: "cr1-building",
+    floorNumber,
+    floor: floorLabel,
+    description: `${name} is listed on the ${floorLabel.toLowerCase()} of the Comfort Room Building.`,
+    directions: `Enter the Comfort Room Building and proceed to the ${floorLabel.toLowerCase()}.`,
+  }));
+}
+
 const buildingB1Rooms: BuildingRoom[] = [
   ...directoryRooms("b1", 1, ["B1-101", "B1-102", "B1-103", "B1-104"]),
   ...directoryRooms("b1", 2, ["B1-205", "B1-206", "B1-207", "B1-208"]),
-  ...directoryRooms("b1", 3, ["B1-309", "B1-311", "B1-312"]),
+  ...directoryRooms("b1", 3, ["B1-309", "B1-310", "B1-311", "B1-312"]),
 ];
 
 const buildingB2Rooms: BuildingRoom[] = [
@@ -180,11 +203,17 @@ const buildingB2Rooms: BuildingRoom[] = [
   ...directoryRooms("b2", 3, ["PPMGS Visayan", "B2-313", "B2-314", "B2-315", "B2-316", "B2-317", "B2-318"]),
 ];
 
+const comfortRoomBuildingRooms: BuildingRoom[] = [
+  ...comfortRoomFloor(1),
+  ...comfortRoomFloor(2),
+  ...comfortRoomFloor(3),
+];
+
 const buildingRooms: Record<string, BuildingRoom[]> = {
   ob: oldBuildingRooms,
   b1: buildingB1Rooms,
   b2: buildingB2Rooms,
-  "cr1-building": [],
+  "cr1-building": comfortRoomBuildingRooms,
 };
 
 // These existing polygons can still return to their parent building when

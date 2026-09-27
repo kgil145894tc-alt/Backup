@@ -2,6 +2,7 @@ import {
   createUserWithEmailAndPassword,
   GoogleAuthProvider,
   onAuthStateChanged,
+  sendPasswordResetEmail,
   signInWithEmailAndPassword,
   signInWithCredential,
   signInWithPopup,
@@ -85,6 +86,17 @@ export async function signInUserWithEmailPassword(
   await syncAllowedUserProfile(userCredential.user);
 
   return toAppUserSession(userCredential.user);
+}
+
+export async function sendUserPasswordResetEmail(email: string) {
+  if (!firebaseAuth) {
+    throw new Error("Firebase Auth is not configured.");
+  }
+
+  const normalizedEmail = email.trim().toLowerCase();
+  enforceAllowedEmailValue(normalizedEmail);
+
+  await sendPasswordResetEmail(firebaseAuth, normalizedEmail);
 }
 
 export async function signInUserWithGoogleIdToken(idToken: string) {

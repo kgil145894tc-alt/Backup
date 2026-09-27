@@ -2,7 +2,7 @@ import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import * as SystemUI from "expo-system-ui";
 import { useEffect } from "react";
-import { Platform, StatusBar as NativeStatusBar } from "react-native";
+import { StatusBar as NativeStatusBar, Platform } from "react-native";
 
 import { useDesignFonts } from "@/utils/designFonts";
 
@@ -31,14 +31,26 @@ export default function RootLayout() {
 
   return (
     <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="index" options={{ headerShown: false }} />
-      <Stack.Screen name="login" options={{ headerShown: false }} />
-      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      <Stack.Screen name="building-floors" options={{ title: "Building Floors" }} />
-      <Stack.Screen name="room-details" options={{ title: "Room Details" }} />
-      <Stack.Screen name="room-map" options={{ title: "Floor Plan" }} />
-      <Stack.Screen name="notifications" options={{ headerShown: false }} />
-      <Stack.Screen name="admin" options={{ headerShown: false }} />
+      <Stack.Screen
+        name="index"
+        options={{ headerShown: false, animation: "slide_from_bottom" }}
+      />
+      <Stack.Screen
+        name="login"
+        options={{ headerShown: false, animation: "slide_from_right" }}
+      />
+      <Stack.Screen
+        name="(tabs)"
+        options={{ headerShown: false, animation: "fade" }}
+      />
+      <Stack.Screen
+        name="notifications"
+        options={{ headerShown: false, animation: "slide_from_bottom" }}
+      />
+      <Stack.Screen
+        name="admin"
+        options={{ headerShown: false, animation: "slide_from_bottom" }}
+      />
     </Stack>
   );
 }

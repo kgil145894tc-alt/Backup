@@ -1,5 +1,6 @@
 // Used by src/screens/categoriesScreen.jsx
 import { StyleSheet } from "react-native";
+import { rf, rs } from "@/utils/responsive";
 
 export const styles = StyleSheet.create({
   // Screen Background and Safe Area
@@ -10,10 +11,10 @@ export const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
-    paddingHorizontal: 17,
-    paddingTop: 12,
-    paddingBottom: 71,
+    gap: rs(12, 8, 14),
+    paddingHorizontal: rs(17, 12, 20),
+    paddingTop: rs(12, 8, 14),
+    paddingBottom: rs(42, 24, 46),
   },
   backButton: {
     width: 44,
@@ -21,19 +22,23 @@ export const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  title: { fontSize: 20, fontWeight: "700", color: "white" },
+  title: { fontSize: rf(20, 18, 22), fontWeight: "700", color: "white" },
   // Scrollable Category Grid
   list: { flex: 1 },
   // Grid Padding and Vertical Card Spacing
   content: {
-    paddingHorizontal: 18,
+    paddingHorizontal: rs(18, 14, 22),
     paddingTop: 4,
-    paddingBottom: 28,
+    paddingBottom: rs(28, 22, 34),
     width: "100%",
     maxWidth: 600,
     alignSelf: "center",
-    gap: 27,
+    gap: rs(18, 14, 20),
+  },
+  compactContent: {
+    paddingHorizontal: rs(14, 12, 18),
+    gap: rs(14, 12, 16),
   },
   // Horizontal Space Between Cards
-  row: { gap: 21 },
+  row: { gap: rs(14, 10, 16) },
 });

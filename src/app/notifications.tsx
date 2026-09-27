@@ -1,6 +1,6 @@
 import { router, useFocusEffect } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { FlatList, Pressable, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -13,11 +13,14 @@ import Background from "../../assets/design/backgrounds/eightBg.svg";
 import CloseIcon from "../../assets/design/icons/close.svg";
 import ProtectedAccess from "@/components/ProtectedAccess";
 import { type CampusNotification } from "../data/notifications";
-import { loadNotifications } from "../services/notificationStore";
+import { subscribeToNotifications } from "../services/notificationStore";
 import { getReadNotificationIds, markNotificationRead } from "../utils/notificationReadState";
 import { styles } from "../styles/official/notificationsScreen.styles";
 
-function toOfficialNotification(notification: CampusNotification): OfficialNotificationItem {
+function toOfficialNotification(
+  notification: CampusNotification,
+  readNotificationIds?: Set<string>,
+): OfficialNotificationItem {
   return {
     id: notification.id,
     title: notification.title,
@@ -25,22 +28,24 @@ function toOfficialNotification(notification: CampusNotification): OfficialNotif
     time: notification.timeLabel,
     buildingName: notification.locationName,
     locationName: notification.locationSubtitle,
+    unread: readNotificationIds
+      ? !readNotificationIds.has(notification.id)
+      : false,
   };
 }
 
 export default function NotificationsScreen() {
   const [notifications, setNotifications] = useState<CampusNotification[]>([]);
   const [selectedNotification, setSelectedNotification] = useState<CampusNotification>();
-  const [, setReadNotificationIds] = useState<Set<string>>(new Set());
+  const [readNotificationIds, setReadNotificationIds] = useState<Set<string>>(new Set());
 
   useFocusEffect(
     useCallback(() => {
       let isActive = true;
 
-      void Promise.all([loadNotifications(), getReadNotificationIds()]).then(
-        ([nextNotifications, nextReadNotificationIds]) => {
+      void getReadNotificationIds().then(
+        (nextReadNotificationIds) => {
           if (isActive) {
-            setNotifications(nextNotifications);
             setReadNotificationIds(nextReadNotificationIds);
           }
         },
@@ -51,6 +56,8 @@ export default function NotificationsScreen() {
       };
     }, []),
   );
+
+  useEffect(() => subscribeToNotifications(setNotifications), []);
 
   const openNotificationDetails = (item: OfficialNotificationItem) => {
     const notification = notifications.find((candidate) => candidate.id === item.id);
@@ -85,7 +92,9 @@ export default function NotificationsScreen() {
         </SafeAreaView>
         <SafeAreaView edges={["left", "right", "bottom"]} style={styles.body}>
           <FlatList
-            data={notifications.map(toOfficialNotification)}
+            data={notifications.map((notification) =>
+              toOfficialNotification(notification, readNotificationIds),
+            )}
             keyExtractor={(item) => item.id}
             contentContainerStyle={styles.content}
             showsVerticalScrollIndicator={false}
@@ -98,7 +107,7 @@ export default function NotificationsScreen() {
         </SafeAreaView>
         {selectedNotification ? (
           <OfficialNotificationDetailSheet
-            item={toOfficialNotification(selectedNotification)}
+            item={toOfficialNotification(selectedNotification, readNotificationIds)}
             onClosed={() => setSelectedNotification(undefined)}
           />
         ) : null}

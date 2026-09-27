@@ -58,6 +58,8 @@ export function OfficialBottomNavigation({
   onSelect?: (name: string) => void;
 }) {
   const [keyboardVisible, setKeyboardVisible] = useState(() => Keyboard.isVisible());
+  const { width } = useWindowDimensions();
+  const isCompact = width < 360;
 
   useEffect(() => {
     const showEvent = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
@@ -93,12 +95,14 @@ export function OfficialBottomNavigation({
                 ]}
               >
                 <Icon
-                  width={45}
-                  height={40}
+                  width={isCompact ? 34 : 42}
+                  height={isCompact ? 32 : 38}
                   color={selected ? "#A42330" : "#6C757D"}
                   accessible={false}
                 />
                 <Text
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
                   style={[
                     bottomNavStyles.label,
                     bottomNavStyles.font,
@@ -281,10 +285,13 @@ export function OfficialCategoryCard({
   item: OfficialCategoryItem;
   onPress?: (item: OfficialCategoryItem) => void;
 }) {
+  const { width } = useWindowDimensions();
+  const iconSize = width < 360 ? 38 : 46;
+
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`${item.name}, ${item.count} buildings`}
+      accessibilityLabel={`${item.name}, ${item.count} locations`}
       onPress={() => onPress?.(item)}
       style={({ pressed }) => [
         categoryCardStyles.card,
@@ -293,10 +300,20 @@ export function OfficialCategoryCard({
       ]}
     >
       <View style={categoryCardStyles.details}>
-        <Icon width={50} height={50} accessible={false} />
-        <Text style={[categoryCardStyles.name, categoryCardStyles.nameFont]}>{item.name}</Text>
-        <Text style={[categoryCardStyles.count, categoryCardStyles.countFont]}>
-          {item.count} {item.count === 1 ? "building" : "buildings"}
+        <Icon width={iconSize} height={iconSize} accessible={false} />
+        <Text
+          numberOfLines={2}
+          adjustsFontSizeToFit
+          style={[categoryCardStyles.name, categoryCardStyles.nameFont]}
+        >
+          {item.name}
+        </Text>
+        <Text
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          style={[categoryCardStyles.count, categoryCardStyles.countFont]}
+        >
+          {item.count} {item.count === 1 ? "location" : "locations"}
         </Text>
       </View>
       <Image source={item.image} style={categoryCardStyles.photo} contentFit="cover" />
@@ -342,6 +359,7 @@ export type OfficialNotificationItem = {
   message: string;
   time: string;
   title: string;
+  unread?: boolean;
 };
 
 export function OfficialNotificationCard({
@@ -358,13 +376,17 @@ export function OfficialNotificationCard({
       onPress={() => onPress?.(item)}
       style={({ pressed }) => [
         notificationCardStyles.card,
+        item.unread && notificationCardStyles.unreadCard,
         pressed && notificationCardStyles.pressed,
       ]}
     >
       <View style={notificationCardStyles.copy}>
-        <Text style={[notificationCardStyles.title, notificationCardStyles.titleFont]}>
-          {item.title}
-        </Text>
+        <View style={notificationCardStyles.titleRow}>
+          {item.unread ? <View style={notificationCardStyles.unreadDot} /> : null}
+          <Text style={[notificationCardStyles.title, notificationCardStyles.titleFont]}>
+            {item.title}
+          </Text>
+        </View>
         <Text style={[notificationCardStyles.message, notificationCardStyles.regularFont]}>
           {item.message}
         </Text>

@@ -4,6 +4,7 @@ import {
   getDoc,
   getDocs,
   limit,
+  onSnapshot,
   orderBy,
   query,
   serverTimestamp,
@@ -240,6 +241,32 @@ export async function getNotifications(maxItems = 25) {
     ...notificationDoc.data(),
     id: notificationDoc.id,
   })) as FirestoreNotification[];
+}
+
+export function watchNotifications(
+  onChange: (notifications: FirestoreNotification[]) => void,
+  onError?: (error: Error) => void,
+  maxItems = 25,
+) {
+  const db = requireFirestore();
+  const notificationsQuery = query(
+    collection(db, NOTIFICATIONS_COLLECTION),
+    orderBy("createdAtMs", "desc"),
+    limit(maxItems),
+  );
+
+  return onSnapshot(
+    notificationsQuery,
+    (snapshot) => {
+      onChange(
+        snapshot.docs.map((notificationDoc) => ({
+          ...notificationDoc.data(),
+          id: notificationDoc.id,
+        })) as FirestoreNotification[],
+      );
+    },
+    onError,
+  );
 }
 
 export async function createNotification(

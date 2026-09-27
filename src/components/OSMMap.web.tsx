@@ -15,7 +15,9 @@ type OSMMapProps = {
   featureOverrides?: SelectedMapFeature[];
   openSelectedPopup?: boolean;
   currentLocation?: CurrentMapLocation;
+  currentLocationFocusRequest?: number;
   onFeaturePress?: (feature: SelectedMapFeature) => void;
+  onMapReady?: () => void;
 };
 
 const mapBearing = 232;
@@ -28,7 +30,9 @@ export default function OSMMap({
   featureOverrides = [],
   openSelectedPopup = true,
   currentLocation,
+  currentLocationFocusRequest = 0,
   onFeaturePress,
+  onMapReady,
 }: OSMMapProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
@@ -46,6 +50,10 @@ export default function OSMMap({
       if (message.event === "feature-selected" && message.feature) {
         onFeaturePress?.(message.feature);
       }
+
+      if (message.event === "map-ready") {
+        onMapReady?.();
+      }
     }
 
     window.addEventListener("message", handleMessage);
@@ -53,7 +61,7 @@ export default function OSMMap({
     return () => {
       window.removeEventListener("message", handleMessage);
     };
-  }, [onFeaturePress]);
+  }, [onFeaturePress, onMapReady]);
 
   useEffect(() => {
     iframeRef.current?.contentWindow?.postMessage(
@@ -64,6 +72,20 @@ export default function OSMMap({
       "*",
     );
   }, [currentLocation]);
+
+  useEffect(() => {
+    if (!currentLocation || currentLocationFocusRequest === 0) {
+      return;
+    }
+
+    iframeRef.current?.contentWindow?.postMessage(
+      {
+        event: "focus-current-location",
+        location: currentLocation,
+      },
+      "*",
+    );
+  }, [currentLocation, currentLocationFocusRequest]);
 
   const html = useMemo(
     () => `
@@ -172,15 +194,140 @@ export default function OSMMap({
           }
 
           .campus-pin.category {
-            background: #ffb020;
-            height: 20px;
-            width: 20px;
+            background: #ef1f2f;
+            height: 28px;
+            width: 28px;
           }
 
           .campus-category-marker {
             align-items: center;
             display: flex;
             justify-content: center;
+            overflow: visible;
+            pointer-events: auto;
+            z-index: 9000 !important;
+          }
+
+          .campus-selected-marker {
+            height: 74px;
+            position: relative;
+            transform: translateY(-8px);
+            width: 74px;
+          }
+
+          .campus-selected-marker::before,
+          .campus-selected-marker::after,
+          .campus-selected-marker .pulse-ring {
+            animation: campus-marker-pulse 1.9s ease-out infinite;
+            background: rgba(239, 31, 47, 0.2);
+            border-radius: 50%;
+            content: "";
+            height: 54px;
+            left: 10px;
+            position: absolute;
+            top: 8px;
+            width: 54px;
+          }
+
+          .campus-selected-marker::after {
+            animation-delay: 0.45s;
+          }
+
+          .campus-selected-marker .pulse-ring {
+            animation-delay: 0.9s;
+          }
+
+          .campus-selected-marker .pin-wrap {
+            animation: campus-marker-bounce 1.05s ease-in-out infinite;
+            height: 52px;
+            left: 11px;
+            position: absolute;
+            top: 0;
+            transform-origin: 50% 100%;
+            width: 52px;
+            z-index: 2;
+          }
+
+          .campus-selected-marker .pin-shadow {
+            animation: campus-marker-shadow 1.05s ease-in-out infinite;
+            background: rgba(92, 12, 20, 0.28);
+            border-radius: 50%;
+            bottom: 5px;
+            filter: blur(2px);
+            height: 8px;
+            left: 22px;
+            position: absolute;
+            width: 30px;
+            z-index: 1;
+          }
+
+          .campus-selected-marker .pin-body {
+            background: linear-gradient(145deg, #ff463f 0%, #dc1128 58%, #a70d1d 100%);
+            border: 3px solid #ffffff;
+            border-radius: 50% 50% 50% 0;
+            box-shadow:
+              0 10px 16px rgba(88, 12, 20, 0.34),
+              inset -5px -6px 9px rgba(120, 6, 17, 0.28),
+              inset 5px 5px 10px rgba(255, 125, 112, 0.42);
+            height: 38px;
+            left: 7px;
+            position: absolute;
+            top: 4px;
+            transform: rotate(-45deg);
+            width: 38px;
+          }
+
+          .campus-selected-marker .pin-body::after {
+            background: #ffffff;
+            border-radius: 50%;
+            box-shadow: inset 0 1px 3px rgba(92, 12, 20, 0.16);
+            content: "";
+            height: 13px;
+            left: 10px;
+            position: absolute;
+            top: 10px;
+            width: 13px;
+          }
+
+          @keyframes campus-marker-pulse {
+            0% {
+              opacity: 0.55;
+              transform: scale(0.55);
+            }
+
+            72% {
+              opacity: 0.04;
+              transform: scale(1.45);
+            }
+
+            100% {
+              opacity: 0;
+              transform: scale(1.65);
+            }
+          }
+
+          @keyframes campus-marker-bounce {
+            0%,
+            100% {
+              transform: translateY(0) scale(1);
+            }
+
+            50% {
+              transform: translateY(-8px) scale(1.03);
+            }
+          }
+
+          @keyframes campus-marker-shadow {
+            0%,
+            100% {
+              opacity: 0.3;
+              transform: scale(1);
+            }
+
+            50% {
+              opacity: 0.16;
+              transform: scale(0.72);
+            }
           }
         </style>
       </head>
@@ -197,12 +344,33 @@ export default function OSMMap({
             bearing: ${mapBearing},
             touchRotate: false,
             rotateControl: false,
-            zoomControl: true,
+            zoomControl: false,
             maxBoundsViscosity: 0.25
           }).setView(
             [7.4259, 125.7939],
             18
           );
+
+          map.createPane("selected-marker-pane");
+          map.getPane("selected-marker-pane").style.zIndex = 760;
+
+          function smoothFocusBounds(bounds, options) {
+            const focusOptions = Object.assign(
+              {
+                animate: true,
+                duration: 1.25,
+                easeLinearity: 0.18
+              },
+              options || {}
+            );
+
+            if (map.flyToBounds) {
+              map.flyToBounds(bounds, focusOptions);
+              return;
+            }
+
+            map.fitBounds(bounds, focusOptions);
+          }
 
           L.tileLayer(
             "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
@@ -436,9 +604,15 @@ export default function OSMMap({
 
           const categoryMarkerIcon = L.divIcon({
             className: "campus-category-marker",
-            html: '<div class="campus-pin category"></div>',
-            iconSize: [26, 26],
-            iconAnchor: [13, 24]
+            html:
+              '<div class="campus-selected-marker">' +
+              '<span class="pulse-ring"></span>' +
+              '<span class="pin-shadow"></span>' +
+              '<span class="pin-wrap"><span class="pin-body"></span></span>' +
+              '</div>',
+            iconSize: [74, 74],
+            iconAnchor: [37, 58],
+            popupAnchor: [0, -58]
           });
 
           let currentLocationMarker = null;
@@ -488,9 +662,38 @@ export default function OSMMap({
             }
           }
 
+          function focusCurrentLocation(currentLocation) {
+            setCurrentLocation(currentLocation);
+
+            if (
+              !currentLocation ||
+              typeof currentLocation.latitude !== "number" ||
+              typeof currentLocation.longitude !== "number"
+            ) {
+              return;
+            }
+
+            map.flyTo(
+              [
+                currentLocation.latitude,
+                currentLocation.longitude
+              ],
+              Math.max(map.getZoom(), 20),
+              {
+                animate: true,
+                duration: 1.1,
+                easeLinearity: 0.18
+              }
+            );
+          }
+
           window.addEventListener("message", function (event) {
             if (event.data && event.data.event === "set-current-location") {
               setCurrentLocation(event.data.location);
+            }
+
+            if (event.data && event.data.event === "focus-current-location") {
+              focusCurrentLocation(event.data.location);
             }
           });
 
@@ -585,7 +788,8 @@ export default function OSMMap({
                   layer.getBounds().getCenter(),
                   {
                     icon: categoryMarkerIcon,
-                    zIndexOffset: 900
+                    pane: "selected-marker-pane",
+                    zIndexOffset: 9000
                   }
                 ).addTo(map);
 
@@ -605,7 +809,8 @@ export default function OSMMap({
                 layer.getBounds().getCenter(),
                 {
                   icon: categoryMarkerIcon,
-                  zIndexOffset: 800
+                  pane: "selected-marker-pane",
+                  zIndexOffset: 8000
                 }
               ).addTo(map);
 
@@ -750,7 +955,7 @@ export default function OSMMap({
             }
 
             if (selectedFeature.layer.getBounds) {
-              map.fitBounds(
+              smoothFocusBounds(
                 selectedFeature.layer.getBounds(),
                 {
                   padding: [60, 60],
@@ -776,7 +981,7 @@ export default function OSMMap({
               )
             );
 
-            map.fitBounds(
+            smoothFocusBounds(
               bounds,
               {
                 padding: [70, 70],
@@ -825,6 +1030,13 @@ export default function OSMMap({
             } else {
               focusSelectedCategory();
             }
+
+            window.parent.postMessage(
+              {
+                event: "map-ready"
+              },
+              "*"
+            );
           }, 500);
         </script>
       </body>

@@ -6,6 +6,7 @@ import {
   canUseFirestore,
   getNotifications,
   type FirestoreNotification,
+  watchNotifications,
 } from "./firestoreData";
 
 export async function loadNotifications() {
@@ -26,6 +27,39 @@ export async function loadNotifications() {
   } catch (error) {
     console.warn("Failed to load notifications from Firestore", error);
     return campusNotifications;
+  }
+}
+
+export function subscribeToNotifications(
+  onChange: (notifications: CampusNotification[]) => void,
+) {
+  if (!canUseFirestore()) {
+    onChange(campusNotifications);
+    return () => {};
+  }
+
+  try {
+    return watchNotifications(
+      (firestoreNotifications) => {
+        onChange(
+          firestoreNotifications.length
+            ? dedupeNotifications(
+                firestoreNotifications.map(
+                  firestoreNotificationToCampusNotification,
+                ),
+              )
+            : campusNotifications,
+        );
+      },
+      (error) => {
+        console.warn("Failed to subscribe to notifications", error);
+        onChange(campusNotifications);
+      },
+    );
+  } catch (error) {
+    console.warn("Failed to start notification subscription", error);
+    onChange(campusNotifications);
+    return () => {};
   }
 }
 
@@ -65,8 +99,8 @@ function firestoreNotificationToCampusNotification(
     title: notification.title,
     message: notification.message,
     timeLabel:
-      notification.timeLabel ||
-      formatNotificationTime(notification.createdAtMs),
+      formatNotificationTime(notification.createdAtMs) ||
+      notification.timeLabel,
     category: notification.category,
     locationName: notification.locationName,
     locationSubtitle: notification.locationSubtitle,
@@ -75,22 +109,11 @@ function firestoreNotificationToCampusNotification(
 
 function formatNotificationTime(createdAtMs?: number) {
   if (!createdAtMs) {
-    return "Recently";
+    return "";
   }
 
-  const elapsedMs = Date.now() - createdAtMs;
-  const elapsedMinutes = Math.max(1, Math.round(elapsedMs / 60000));
-
-  if (elapsedMinutes < 60) {
-    return `${elapsedMinutes} min ago`;
-  }
-
-  const elapsedHours = Math.round(elapsedMinutes / 60);
-
-  if (elapsedHours < 24) {
-    return `${elapsedHours} hour${elapsedHours === 1 ? "" : "s"} ago`;
-  }
-
-  const elapsedDays = Math.round(elapsedHours / 24);
-  return `${elapsedDays} day${elapsedDays === 1 ? "" : "s"} ago`;
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date(createdAtMs));
 }

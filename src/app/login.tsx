@@ -1,9 +1,11 @@
 import { Image } from "expo-image";
 import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
+  Keyboard,
   Platform,
   Pressable,
   ScrollView,
@@ -18,6 +20,7 @@ import GuestIcon from "../../assets/design/icons/user.svg";
 import {
   canUseFirebaseUserAuth,
   registerUserWithEmailPassword,
+  sendUserPasswordResetEmail,
   signInUserWithEmailPassword,
   signInUserWithGoogleIdToken,
   signInUserWithGooglePopup,
@@ -105,8 +108,10 @@ export default function LoginScreen() {
   const [loginError, setLoginError] = useState("");
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [isEmailLoading, setIsEmailLoading] = useState(false);
+  const [isPasswordResetLoading, setIsPasswordResetLoading] = useState(false);
   const [isCreatingAccount, setIsCreatingAccount] = useState(false);
   const [acceptedPrivacy, setAcceptedPrivacy] = useState(false);
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -219,9 +224,54 @@ export default function LoginScreen() {
     }
   };
 
+  const handleForgotPassword = async () => {
+    setLoginError("");
+
+    if (!canUseFirebaseUserAuth()) {
+      setLoginError("Firebase Auth is not configured yet.");
+      return;
+    }
+
+    if (!email.trim()) {
+      setLoginError("Please enter your UMindanao email first.");
+      return;
+    }
+
+    setIsPasswordResetLoading(true);
+
+    try {
+      await sendUserPasswordResetEmail(email);
+      Alert.alert(
+        "Password reset sent",
+        "Check your UMindanao email for a password reset link.",
+      );
+    } catch (error) {
+      console.warn("Password reset failed", error);
+      setLoginError(getPasswordResetErrorMessage(error));
+    } finally {
+      setIsPasswordResetLoading(false);
+    }
+  };
+
   const isIosEmailLogin = Platform.OS === "ios";
 
+  useEffect(() => {
+    const showEvent =
+      Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
+    const hideEvent =
+      Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
+    const showSubscription = Keyboard.addListener(showEvent, () =>
+      setIsKeyboardVisible(true),
+    );
+    const hideSubscription = Keyboard.addListener(hideEvent, () =>
+      setIsKeyboardVisible(false),
+    );
 
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+    };
+  }, []);
 
   return (
     <View style={styles.screen}>
@@ -238,8 +288,14 @@ export default function LoginScreen() {
 
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[
+          styles.content,
+          isIosEmailLogin && styles.iosContent,
+          isKeyboardVisible && styles.keyboardContent,
+        ]}
         showsVerticalScrollIndicator={false}
+        scrollEnabled={!isIosEmailLogin || isKeyboardVisible}
+        keyboardDismissMode="interactive"
         keyboardShouldPersistTaps="handled"
       >
         <Image
@@ -344,7 +400,7 @@ export default function LoginScreen() {
 
             <TextInput
               autoCapitalize="none"
-              editable={!isEmailLoading}
+              editable={!isEmailLoading && !isPasswordResetLoading}
               placeholder="Password"
               placeholderTextColor="#9ca3af"
               secureTextEntry
@@ -353,6 +409,27 @@ export default function LoginScreen() {
               value={password}
               onChangeText={setPassword}
             />
+
+            {!isCreatingAccount ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Send password reset email"
+                disabled={isEmailLoading || isPasswordResetLoading}
+                onPress={handleForgotPassword}
+                style={({ pressed }) => [
+                  styles.forgotPasswordButton,
+                  pressed && styles.pressed,
+                  (isEmailLoading || isPasswordResetLoading) &&
+                    styles.primaryButtonDisabled,
+                ]}
+              >
+                <Text style={styles.forgotPasswordText}>
+                  {isPasswordResetLoading
+                    ? "Sending reset email..."
+                    : "Forgot password?"}
+                </Text>
+              </Pressable>
+            ) : null}
 
             {isCreatingAccount ? (
               <Pressable
@@ -377,15 +454,23 @@ export default function LoginScreen() {
             ) : null}
 
             <Pressable
-              disabled={isEmailLoading}
+              disabled={isEmailLoading || isPasswordResetLoading}
               style={[
                 styles.button,
                 styles.guestButton,
-                isEmailLoading && styles.primaryButtonDisabled,
+                styles.iosFormButton,
+                (isEmailLoading || isPasswordResetLoading) &&
+                  styles.primaryButtonDisabled,
               ]}
               onPress={handleEmailPasswordLogin}
             >
-              <Text style={[styles.buttonText, styles.guestText]}>
+              <Text
+                style={[
+                  styles.buttonText,
+                  styles.guestText,
+                  styles.iosFormButtonText,
+                ]}
+              >
                 {isEmailLoading
                   ? "Please wait..."
                   : isCreatingAccount
@@ -421,7 +506,11 @@ export default function LoginScreen() {
         ) : null}
 
         <Pressable
-          style={[styles.button, styles.guestButton]}
+          style={[
+            styles.button,
+            styles.guestButton,
+            isIosEmailLogin && styles.iosGuestButton,
+          ]}
           onPress={() => {
             void clearStoredUserSession().then(() =>
               setAppAccessMode("guest"),
@@ -520,4 +609,35 @@ function getEmailPasswordErrorMessage(error: unknown) {
   return code
     ? `Email login failed: ${code}`
     : "Email login failed. Please try again.";
+}
+
+function getPasswordResetErrorMessage(error: unknown) {
+  const code =
+    error && typeof error === "object" && "code" in error
+      ? String((error as { code?: unknown }).code)
+      : "";
+
+  if (code === "auth/unauthorized-school-domain") {
+    return "Please use your umindanao.edu.ph email address.";
+  }
+
+  if (code === "auth/invalid-email") {
+    return "Please enter a valid UMindanao email address.";
+  }
+
+  if (code === "auth/user-not-found") {
+    return "No account was found for that email address.";
+  }
+
+  if (code === "auth/too-many-requests") {
+    return "Too many reset requests. Please try again later.";
+  }
+
+  if (code === "auth/operation-not-allowed") {
+    return "Password reset is not enabled in Firebase Authentication.";
+  }
+
+  return code
+    ? `Password reset failed: ${code}`
+    : "Password reset failed. Please try again.";
 }

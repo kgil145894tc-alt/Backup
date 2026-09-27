@@ -1,7 +1,7 @@
 import { router, useFocusEffect } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useMemo, useRef, useState } from "react";
-import { FlatList, Pressable, Text, View } from "react-native";
+import { FlatList, Pressable, Text, View, useWindowDimensions } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import {
@@ -10,72 +10,102 @@ import {
   type OfficialCategoryItem,
 } from "@/components/OfficialDesign";
 import Academic from "../../../assets/design/icons/academic.svg";
-import Admin from "../../../assets/design/icons/admin-office.svg";
 import Background from "../../../assets/design/backgrounds/fifthBg.svg";
 import BackArrow from "../../../assets/design/icons/back-arrow.svg";
 import Facilities from "../../../assets/design/icons/facilities-cog.svg";
+import Food from "../../../assets/design/icons/food.svg";
+import Offices from "../../../assets/design/icons/offices.svg";
 import OtherBuildings from "../../../assets/design/icons/other-building.svg";
+import Services from "../../../assets/design/icons/services.svg";
 import ProtectedAccess from "@/components/ProtectedAccess";
 import { loadCampusData } from "../../services/campusDataStore";
-import type { CampusFeatureCategory } from "../../types/campus";
 import { initialAdminLocations, type AdminLocation } from "../../utils/adminLocations";
 import { navigateToTab } from "@/utils/navigation";
 import { styles } from "../../styles/official/categoriesScreen.styles";
 
 type CategoryCardConfig = OfficialCategoryItem & {
-  mapCategory?: CampusFeatureCategory;
+  mapCategory: string;
 };
 
 const categoryImages = {
   academic: require("../../../assets/design/locations/category-academic.png"),
   admin: require("../../../assets/design/locations/category-admin.png"),
+  cafeteria: require("../../../assets/design/locations/cafeteria.png"),
   facilities: require("../../../assets/design/locations/category-facilities.png"),
+  faculty: require("../../../assets/design/locations/teachers-faculty.png"),
+  laboratory: require("../../../assets/design/locations/new-building.png"),
   other: require("../../../assets/design/locations/category-other.png"),
 };
 
-const categoryCards: CategoryCardConfig[] = [
-  {
-    id: "academic",
-    name: "Academic",
+const categoryPresentation = {
+  Building: {
     color: "#AF2532",
     image: categoryImages.academic,
-    count: 0,
-    mapCategory: "Room",
+    Icon: OtherBuildings,
   },
-  {
-    id: "admin",
-    name: "Admin",
-    color: "#FEBF1F",
-    image: categoryImages.admin,
-    count: 0,
-    mapCategory: "Office",
-  },
-  {
-    id: "facilities",
-    name: "Facilities",
+  Facility: {
     color: "#1EAB58",
     image: categoryImages.facilities,
-    count: 0,
-    mapCategory: "Facility",
+    Icon: Facilities,
   },
-  {
-    id: "other",
-    name: "Other Buildings",
+  Faculty: {
+    color: "#7B4FC9",
+    image: categoryImages.faculty,
+    Icon: Academic,
+  },
+  Food: {
     color: "#FA5D0E",
-    image: categoryImages.other,
-    count: 0,
+    image: categoryImages.cafeteria,
+    Icon: Food,
   },
+  Laboratory: {
+    color: "#208AEF",
+    image: categoryImages.laboratory,
+    Icon: Academic,
+  },
+  Office: {
+    color: "#FEBF1F",
+    image: categoryImages.admin,
+    Icon: Offices,
+  },
+  Room: {
+    color: "#AF2532",
+    image: categoryImages.academic,
+    Icon: Academic,
+  },
+  Security: {
+    color: "#2F4858",
+    image: categoryImages.other,
+    Icon: Services,
+  },
+};
+
+const fallbackCategoryPresentation = {
+  color: "#6C757D",
+  image: categoryImages.other,
+  Icon: OtherBuildings,
+};
+
+const preferredCategoryOrder = [
+  "Building",
+  "Room",
+  "Laboratory",
+  "Faculty",
+  "Office",
+  "Facility",
+  "Food",
+  "Security",
 ];
 
-const icons = {
-  academic: Academic,
-  admin: Admin,
-  facilities: Facilities,
-  other: OtherBuildings,
-};
+function toCategoryId(category: string) {
+  return category.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+}
 
 export default function Categories() {
   const listRef = useRef<FlatList<CategoryCardConfig>>(null);
+  const { width } = useWindowDimensions();
+  const isCompact = width < 380;
+  const numColumns = isCompact ? 1 : 2;
   const [mapFeatures, setMapFeatures] = useState<AdminLocation[]>(initialAdminLocations);
 
   useFocusEffect(
@@ -92,32 +122,45 @@ export default function Categories() {
     }, []),
   );
 
-  const categoryCounts = useMemo(() => {
+  const categories = useMemo<CategoryCardConfig[]>(() => {
     const counts = new Map<string, number>();
+
     mapFeatures.forEach((feature) => {
       counts.set(feature.category, (counts.get(feature.category) ?? 0) + 1);
     });
-    return counts;
+
+    const sortedCategories = [...counts.keys()].sort((first, second) => {
+      const firstIndex = preferredCategoryOrder.indexOf(first);
+      const secondIndex = preferredCategoryOrder.indexOf(second);
+
+      if (firstIndex !== -1 || secondIndex !== -1) {
+        return (
+          (firstIndex === -1 ? Number.MAX_SAFE_INTEGER : firstIndex) -
+          (secondIndex === -1 ? Number.MAX_SAFE_INTEGER : secondIndex)
+        );
+      }
+
+      return first.localeCompare(second);
+    });
+
+    return sortedCategories.map((category) => {
+      const presentation =
+        categoryPresentation[
+          category as keyof typeof categoryPresentation
+        ] ?? fallbackCategoryPresentation;
+
+      return {
+        id: toCategoryId(category),
+        name: category,
+        color: presentation.color,
+        image: presentation.image,
+        count: counts.get(category) ?? 0,
+        mapCategory: category,
+      };
+    });
   }, [mapFeatures]);
 
-  const categories = categoryCards.map((card) => {
-    if (!card.mapCategory) {
-      const known = new Set(categoryCards.map((item) => item.mapCategory).filter(Boolean));
-      return {
-        ...card,
-        count: mapFeatures.filter((feature) => !known.has(feature.category)).length,
-      };
-    }
-
-    return { ...card, count: categoryCounts.get(card.mapCategory) ?? 0 };
-  });
-
   const openCategoryOnMap = (card: CategoryCardConfig) => {
-    if (!card.mapCategory) {
-      router.navigate("/(tabs)/map");
-      return;
-    }
-
     router.navigate({
       pathname: "/(tabs)/map",
       params: { category: card.mapCategory },
@@ -151,18 +194,26 @@ export default function Categories() {
             <Text style={styles.title}>Categories</Text>
           </View>
           <FlatList
+            key={numColumns}
             ref={listRef}
             style={styles.list}
-            contentContainerStyle={styles.content}
-            columnWrapperStyle={styles.row}
+            contentContainerStyle={[
+              styles.content,
+              isCompact && styles.compactContent,
+            ]}
+            columnWrapperStyle={isCompact ? undefined : styles.row}
             data={categories}
-            numColumns={2}
+            numColumns={numColumns}
             keyExtractor={(item) => item.id}
             showsVerticalScrollIndicator={false}
             renderItem={({ item }) => (
               <OfficialCategoryCard
                 item={item}
-                Icon={icons[item.id as keyof typeof icons]}
+                Icon={
+                  categoryPresentation[
+                    item.mapCategory as keyof typeof categoryPresentation
+                  ]?.Icon ?? fallbackCategoryPresentation.Icon
+                }
                 onPress={() => openCategoryOnMap(item)}
               />
             )}
