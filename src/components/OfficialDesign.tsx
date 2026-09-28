@@ -122,7 +122,6 @@ export function OfficialBottomNavigation({
 
 export type OfficialRecentItem = {
   id?: string;
-  image: ImageSource | number;
   name: string;
   time: string;
 };
@@ -182,7 +181,6 @@ export function OfficialRecentLocations({
                         pressed && recentStyles.pressed,
                       ]}
                     >
-                      <Image source={item.image} style={recentStyles.photo} contentFit="cover" />
                       <View style={recentStyles.timeRow}>
                         <DateIcon width={15} height={15} accessible={false} />
                         <Text style={recentStyles.time}>{item.time}</Text>
@@ -219,10 +217,12 @@ const categoryColors: Record<string, string> = {
 };
 
 export function OfficialLocationCard({
+  hideImage = false,
   item,
   onPress,
   variant = "search",
 }: {
+  hideImage?: boolean;
   item: OfficialLocationItem;
   onPress?: (item: OfficialLocationItem) => void;
   variant?: "search" | "history";
@@ -232,9 +232,15 @@ export function OfficialLocationCard({
       accessibilityRole="button"
       accessibilityLabel={`${item.name}, ${item.category}`}
       onPress={() => onPress?.(item)}
-      style={({ pressed }) => [locationCardStyles.card, pressed && locationCardStyles.pressed]}
+      style={({ pressed }) => [
+        locationCardStyles.card,
+        hideImage && locationCardStyles.cardNoImage,
+        pressed && locationCardStyles.pressed,
+      ]}
     >
-      <Image source={item.image} style={locationCardStyles.photo} contentFit="cover" />
+      {hideImage ? null : (
+        <Image source={item.image} style={locationCardStyles.photo} contentFit="cover" />
+      )}
       <View style={locationCardStyles.copy}>
         <Text style={[locationCardStyles.name, locationCardStyles.nameFont]}>{item.name}</Text>
         <View style={locationCardStyles.details}>

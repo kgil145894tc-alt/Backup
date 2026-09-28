@@ -517,6 +517,43 @@ export const styles = StyleSheet.create({
     color: "white",
   },
 
+  sidebarNav: {
+    gap: 10,
+    zIndex: 1,
+  },
+
+  sidebarNavItem: {
+    borderColor: "rgba(255, 255, 255, 0.18)",
+    borderRadius: 14,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    transitionDuration: "180ms" as never,
+    transitionProperty: "background-color, border-color, opacity, transform" as never,
+    transitionTimingFunction: "ease" as never,
+  },
+
+  sidebarNavItemHover: {
+    backgroundColor: "rgba(255, 255, 255, 0.12)",
+    borderColor: "rgba(255, 255, 255, 0.32)",
+  },
+
+  sidebarNavItemActive: {
+    backgroundColor: "rgba(255, 255, 255, 0.18)",
+    borderColor: "#FFC928",
+  },
+
+  sidebarNavText: {
+    color: "rgba(255, 255, 255, 0.82)",
+    fontFamily: "DashboardMedium",
+    fontSize: 15,
+    fontWeight: "900",
+  },
+
+  sidebarNavTextActive: {
+    color: "white",
+  },
+
   sidebarWaves: {
     bottom: -10,
     height: 120,
@@ -810,6 +847,142 @@ export const styles = StyleSheet.create({
     shadowColor: "#6E1C28",
     shadowOpacity: 0.08,
     shadowRadius: 14,
+  },
+
+  activityCard: {
+    backgroundColor: "white",
+    borderRadius: 18,
+    overflow: "hidden",
+    padding: 18,
+    shadowColor: "#6E1C28",
+    shadowOpacity: 0.08,
+    shadowRadius: 14,
+  },
+
+  activityHeader: {
+    borderBottomColor: "#F0DEE1",
+    borderBottomWidth: 1,
+    marginBottom: 8,
+    paddingBottom: 14,
+  },
+
+  activityTitle: {
+    color: "#A42330",
+    fontFamily: "DashboardMedium",
+    fontSize: 22,
+    fontWeight: "900",
+  },
+
+  activitySubtitle: {
+    color: "#6F7478",
+    fontFamily: "DashboardRegular",
+    fontSize: 13,
+    fontWeight: "700",
+    marginTop: 4,
+  },
+
+  activityItem: {
+    alignItems: "flex-start",
+    borderBottomColor: "#F4E4E7",
+    borderBottomWidth: 1,
+    flexDirection: "row",
+    gap: 12,
+    paddingVertical: 16,
+  },
+
+  activityMarker: {
+    backgroundColor: "#BA2634",
+    borderRadius: 999,
+    height: 12,
+    marginTop: 6,
+    width: 12,
+  },
+
+  activityMarkerMap: {
+    backgroundColor: "#FFC928",
+  },
+
+  activityBody: {
+    flex: 1,
+    minWidth: 0,
+  },
+
+  activityMetaRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginBottom: 8,
+  },
+
+  activityBadge: {
+    backgroundColor: "#FDE8EB",
+    borderRadius: 999,
+    color: "#A42330",
+    fontFamily: "DashboardMedium",
+    fontSize: 11,
+    fontWeight: "900",
+    overflow: "hidden",
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    textTransform: "uppercase",
+  },
+
+  activityBadgeMap: {
+    backgroundColor: "#FFF3C4",
+    color: "#7A4C00",
+  },
+
+  activityTime: {
+    color: "#7C848B",
+    fontFamily: "DashboardRegular",
+    fontSize: 12,
+    fontWeight: "800",
+  },
+
+  activityItemTitle: {
+    color: "#2A2D31",
+    fontFamily: "DashboardMedium",
+    fontSize: 16,
+    fontWeight: "900",
+    marginBottom: 4,
+  },
+
+  activityMessage: {
+    color: "#5C646B",
+    fontFamily: "DashboardRegular",
+    fontSize: 14,
+    fontWeight: "700",
+    lineHeight: 20,
+  },
+
+  activityLocation: {
+    color: "#A42330",
+    fontFamily: "DashboardMedium",
+    fontSize: 12,
+    fontWeight: "900",
+    marginTop: 8,
+  },
+
+  activityEmpty: {
+    alignItems: "center",
+    padding: 36,
+  },
+
+  activityEmptyTitle: {
+    color: "#2A2D31",
+    fontFamily: "DashboardMedium",
+    fontSize: 18,
+    fontWeight: "900",
+  },
+
+  activityEmptyText: {
+    color: "#6F7478",
+    fontFamily: "DashboardRegular",
+    fontSize: 14,
+    fontWeight: "700",
+    marginTop: 6,
+    textAlign: "center",
   },
 
   tableInner: {

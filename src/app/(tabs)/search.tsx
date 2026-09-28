@@ -1,7 +1,17 @@
-import { router, useFocusEffect } from "expo-router";
+import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Dimensions, FlatList, Keyboard, Pressable, Text, TextInput, View } from "react-native";
+import {
+  Animated,
+  Dimensions,
+  Easing,
+  FlatList,
+  Keyboard,
+  Pressable,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import {
@@ -63,10 +73,50 @@ function toLocationCardItem(item: SearchResultItem): OfficialLocationItem {
 
 export default function SearchScreen() {
   const inputRef = useRef<TextInput>(null);
+  const searchEnterProgress = useRef(new Animated.Value(0)).current;
+  const { focusSearch, focusAt } = useLocalSearchParams<{
+    focusSearch?: string;
+    focusAt?: string;
+  }>();
   const [query, setQuery] = useState("");
   const [searchOpening, setSearchOpening] = useState(false);
   const [mapFeatures, setMapFeatures] = useState<SearchFeatureItem[]>([]);
   const [recentSearches, setRecentSearches] = useState<GuestHistoryItem[]>([]);
+
+  const runSearchSlideUp = useCallback(() => {
+    searchEnterProgress.setValue(0);
+    Animated.timing(searchEnterProgress, {
+      toValue: 1,
+      duration: 320,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [searchEnterProgress]);
+
+  const searchEnterStyle = useMemo(
+    () => ({
+      opacity: searchEnterProgress.interpolate({
+        inputRange: [0, 0.55, 1],
+        outputRange: [0, 1, 1],
+      }),
+      transform: [
+        {
+          translateY: searchEnterProgress.interpolate({
+            inputRange: [0, 1],
+            outputRange: [44, 0],
+          }),
+        },
+      ],
+    }),
+    [searchEnterProgress],
+  );
+
+  const focusSearchInput = useCallback(() => {
+    setSearchOpening(true);
+    setTimeout(() => {
+      inputRef.current?.focus();
+    }, 220);
+  }, []);
 
   useEffect(() => {
     const subscription = Keyboard.addListener("keyboardDidHide", () => setSearchOpening(false));
@@ -76,6 +126,11 @@ export default function SearchScreen() {
   useFocusEffect(
     useCallback(() => {
       let isActive = true;
+
+      runSearchSlideUp();
+      if (focusSearch === "1") {
+        focusSearchInput();
+      }
 
       async function loadRecentSearches() {
         const [nextRecentSearches, campusData] = await Promise.all([
@@ -105,7 +160,7 @@ export default function SearchScreen() {
       return () => {
         isActive = false;
       };
-    }, []),
+    }, [focusAt, focusSearch, focusSearchInput, runSearchSlideUp]),
   );
 
   const searchTerm = query.trim().toLowerCase();
@@ -141,8 +196,8 @@ export default function SearchScreen() {
     navigateToTab(name, {
       currentTab: "Search",
       onSameTab: () => {
-        setSearchOpening(true);
-        requestAnimationFrame(() => inputRef.current?.focus());
+        runSearchSlideUp();
+        focusSearchInput();
       },
     });
   };
@@ -159,55 +214,61 @@ export default function SearchScreen() {
           />
         </View>
         <SafeAreaView style={styles.safe} edges={["top", "left", "right"]}>
-          <View style={styles.header}>
-            <View style={styles.titleRow}>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Go back"
-                onPress={() => (router.canGoBack() ? router.back() : router.replace("/(tabs)"))}
-                style={styles.backButton}
-              >
-                <BackArrow width={32} height={32} accessible={false} />
-              </Pressable>
-              <Text style={styles.title}>Search</Text>
+          <Animated.View style={[styles.animatedContent, searchEnterStyle]}>
+            <View style={styles.header}>
+              <View style={styles.titleRow}>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Go back"
+                  onPress={() => (router.canGoBack() ? router.back() : router.replace("/(tabs)"))}
+                  style={styles.backButton}
+                >
+                  <BackArrow width={32} height={32} accessible={false} />
+                </Pressable>
+                <Text style={styles.title}>Search</Text>
+              </View>
+              <TextInput
+                ref={inputRef}
+                value={query}
+                onChangeText={setQuery}
+                style={[styles.input, styles.inputFont]}
+                placeholder="Search building, room, or facility..."
+                placeholderTextColor="#6C757D"
+                accessibilityLabel="Search building, room, or facility"
+                returnKeyType="search"
+                autoCorrect={false}
+                onPressIn={() => setSearchOpening(true)}
+                onFocus={() => setSearchOpening(true)}
+                onBlur={() => {
+                  if (!Keyboard.isVisible()) setSearchOpening(false);
+                }}
+              />
             </View>
-            <TextInput
-              ref={inputRef}
-              value={query}
-              onChangeText={setQuery}
-              style={[styles.input, styles.inputFont]}
-              placeholder="Search building, room, or facility..."
-              placeholderTextColor="#6C757D"
-              accessibilityLabel="Search building, room, or facility"
-              returnKeyType="search"
-              autoCorrect={false}
-              onPressIn={() => setSearchOpening(true)}
-              onFocus={() => setSearchOpening(true)}
-              onBlur={() => {
-                if (!Keyboard.isVisible()) setSearchOpening(false);
-              }}
+            <View style={styles.headingContainer}>
+              <Text style={[styles.heading, styles.headingFont]}>
+                {searchTerm ? "Search Results" : "Recent Searches"}
+              </Text>
+            </View>
+            <FlatList
+              style={styles.list}
+              contentContainerStyle={styles.content}
+              data={listData}
+              keyExtractor={(item) => `${item.featureType}-${item.featureId}`}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+              renderItem={({ item }) => (
+                <OfficialLocationCard
+                  hideImage={!searchTerm}
+                  item={toLocationCardItem(item)}
+                  onPress={() => openFeature(item)}
+                />
+              )}
+              ItemSeparatorComponent={() => <View style={styles.separator} />}
+              ListEmptyComponent={
+                <Text style={styles.empty}>No locations found. Try another search.</Text>
+              }
             />
-          </View>
-          <View style={styles.headingContainer}>
-            <Text style={[styles.heading, styles.headingFont]}>
-              {searchTerm ? "Search Results" : "Recent Searches"}
-            </Text>
-          </View>
-          <FlatList
-            style={styles.list}
-            contentContainerStyle={styles.content}
-            data={listData}
-            keyExtractor={(item) => `${item.featureType}-${item.featureId}`}
-            keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator={false}
-            renderItem={({ item }) => (
-              <OfficialLocationCard item={toLocationCardItem(item)} onPress={() => openFeature(item)} />
-            )}
-            ItemSeparatorComponent={() => <View style={styles.separator} />}
-            ListEmptyComponent={
-              <Text style={styles.empty}>No locations found. Try another search.</Text>
-            }
-          />
+          </Animated.View>
           <OfficialBottomNavigation activeItem="Search" onSelect={navigate} hidden={searchOpening} />
         </SafeAreaView>
       </View>

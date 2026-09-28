@@ -2,7 +2,7 @@ import { Image } from "expo-image";
 import { router, useFocusEffect } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useState } from "react";
-import { Pressable, ScrollView, Text, View } from "react-native";
+import { Modal, Pressable, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import LimitedAccessModal from "@/components/LimitedAccessModal";
@@ -119,6 +119,7 @@ const faqSections = [
 export default function ProfileScreen() {
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [isLimitedAccessOpen, setIsLimitedAccessOpen] = useState(false);
+  const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false);
   const [accessMode, setAccessModeState] = useState<AppAccessMode>("guest");
   const [userSession, setUserSession] = useState<StoredUserSession | null>(
     null,
@@ -149,6 +150,7 @@ export default function ProfileScreen() {
   );
 
   const handleLogout = async () => {
+    setIsLogoutConfirmOpen(false);
     await signOutUser();
     await clearStoredUserSession();
     await setAppAccessMode("guest");
@@ -338,7 +340,11 @@ export default function ProfileScreen() {
                   : "Sign out of your account"
               }
               Icon={isGuest ? LoginIcon : LogoutIcon}
-              onPress={isGuest ? () => router.replace("/login") : handleLogout}
+              onPress={
+                isGuest
+                  ? () => router.replace("/login")
+                  : () => setIsLogoutConfirmOpen(true)
+              }
             />
           </View>
         </ScrollView>
@@ -353,6 +359,69 @@ export default function ProfileScreen() {
           router.push("/login");
         }}
       />
+
+      <Modal
+        animationType="fade"
+        transparent
+        visible={isLogoutConfirmOpen}
+        onRequestClose={() => setIsLogoutConfirmOpen(false)}
+      >
+        <View style={styles.logoutModalOverlay}>
+          <View style={styles.logoutModalCard}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Close logout confirmation"
+              onPress={() => setIsLogoutConfirmOpen(false)}
+              style={({ pressed }) => [
+                styles.logoutModalClose,
+                pressed && styles.pressed,
+              ]}
+            >
+              <Text style={[styles.logoutModalCloseText, styles.nameFont]}>
+                ×
+              </Text>
+            </Pressable>
+
+            <View style={styles.logoutIconCircle}>
+              <LogoutIcon width={42} height={42} accessible={false} />
+            </View>
+
+            <Text style={[styles.logoutModalTitle, styles.nameFont]}>
+              Log Out?
+            </Text>
+            <Text style={[styles.logoutModalMessage, styles.mediumFont]}>
+              Are you sure you want to sign out of your UMVCFIND account?
+            </Text>
+
+            <View style={styles.logoutModalActions}>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => setIsLogoutConfirmOpen(false)}
+                style={({ pressed }) => [
+                  styles.logoutCancelButton,
+                  pressed && styles.pressed,
+                ]}
+              >
+                <Text style={[styles.logoutCancelText, styles.nameFont]}>
+                  Cancel
+                </Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                onPress={handleLogout}
+                style={({ pressed }) => [
+                  styles.logoutConfirmButton,
+                  pressed && styles.pressed,
+                ]}
+              >
+                <Text style={[styles.logoutConfirmText, styles.nameFont]}>
+                  Log Out
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }

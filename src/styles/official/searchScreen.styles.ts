@@ -7,6 +7,7 @@ export const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: "white" },
   background: StyleSheet.absoluteFill,
   safe: { flex: 1 },
+  animatedContent: { flex: 1 },
   // Header: Back Button and Title
   header: { paddingHorizontal: rs(17, 12, 20), paddingTop: rs(12, 8, 14), paddingBottom: rs(10, 8, 12) },
   titleRow: {

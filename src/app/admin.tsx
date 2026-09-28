@@ -39,6 +39,7 @@ import {
   type AdminSession,
 } from "../services/adminAuth";
 import { loadCampusData } from "../services/campusDataStore";
+import { subscribeToNotifications } from "../services/notificationStore";
 import {
   adminLocationToFirestore,
   buildingRoomToFirestore,
@@ -89,6 +90,8 @@ type SuccessDialogState = {
   title: string;
 };
 
+type AdminView = "locations" | "activity";
+
 const emptyNotificationDraft: NotificationDraft = {
   category: "announcement",
   message: "",
@@ -132,6 +135,10 @@ export default function AdminScreen() {
     useState(false);
   const [notificationDraft, setNotificationDraft] =
     useState<NotificationDraft>(emptyNotificationDraft);
+  const [adminView, setAdminView] = useState<AdminView>("locations");
+  const [publishedNotifications, setPublishedNotifications] = useState<
+    CampusNotification[]
+  >([]);
   const [fontsLoaded] = useFonts({
     AdminRegular: require("../../assets/fonts/afacad-flux-latin-400-normal.ttf"),
     AdminMedium: require("../../assets/fonts/afacad-flux-latin-500-normal.ttf"),
@@ -174,7 +181,24 @@ export default function AdminScreen() {
     });
   }, []);
 
+  useEffect(
+    () =>
+      subscribeToNotifications((nextNotifications) => {
+        setPublishedNotifications(nextNotifications);
+      }),
+    [],
+  );
+
   const stats = useMemo(() => getAdminStats(locations), [locations]);
+  const activityStats = useMemo(
+    () => ({
+      mapUpdates: publishedNotifications.filter((notification) =>
+        ["building", "room", "maintenance"].includes(notification.category),
+      ).length,
+      published: publishedNotifications.length,
+    }),
+    [publishedNotifications],
+  );
 
   const filteredLocations = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
@@ -703,6 +727,35 @@ export default function AdminScreen() {
           </View>
         </View>
 
+        <View style={styles.sidebarNav}>
+          {[
+            { key: "locations", label: "Location Management" },
+            { key: "activity", label: "Activity" },
+          ].map((item) => (
+            <Pressable
+              key={item.key}
+              accessibilityRole="button"
+              accessibilityState={{ selected: adminView === item.key }}
+              onPress={() => setAdminView(item.key as AdminView)}
+              style={({ hovered, pressed }: any) => [
+                styles.sidebarNavItem,
+                hovered && styles.sidebarNavItemHover,
+                adminView === item.key && styles.sidebarNavItemActive,
+                pressed && styles.buttonPressed,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.sidebarNavText,
+                  adminView === item.key && styles.sidebarNavTextActive,
+                ]}
+              >
+                {item.label}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+
         <View style={styles.sidebarWaves} pointerEvents="none">
           <DashboardWaves
             width="100%"
@@ -721,12 +774,22 @@ export default function AdminScreen() {
         <View style={[styles.adminHeader, isNarrow && styles.adminHeaderNarrow]}>
           <View style={[styles.headingGroup, isNarrow && styles.headingGroupNarrow]}>
             <View style={styles.headingIconCircle}>
-              <DashboardBuildingIcon width={34} height={34} />
+              {adminView === "locations" ? (
+                <DashboardBuildingIcon width={34} height={34} />
+              ) : (
+                <DashboardFacilityIcon width={34} height={34} />
+              )}
             </View>
             <View>
-              <Text style={styles.pageTitle}>Location Management</Text>
+              <Text style={styles.pageTitle}>
+                {adminView === "locations"
+                  ? "Location Management"
+                  : "Activity"}
+              </Text>
               <Text style={styles.pageSubtitle}>
-                Manage campus buildings, rooms, and location details.
+                {adminView === "locations"
+                  ? "Manage campus buildings, rooms, and location details."
+                  : "Review published notifications and map data updates."}
               </Text>
             </View>
           </View>
@@ -770,142 +833,152 @@ export default function AdminScreen() {
           </View>
         </View>
 
-        <View style={styles.statsGrid}>
-          <StatCard
-            Icon={DashboardBuildingIcon}
-            label="Total Buildings"
-            value={stats.totalBuildings}
-          />
-          <StatCard
-            Icon={DashboardAcademicIcon}
-            label="Academic Buildings"
-            value={stats.academicBuildings}
-          />
-          <StatCard
-            Icon={DashboardAdminIcon}
-            label="Admin Buildings"
-            value={stats.adminBuildings}
-          />
-          <StatCard
-            Icon={DashboardFacilityIcon}
-            label="Facilities and Others"
-            value={stats.facilities}
-          />
-        </View>
+        {adminView === "locations" ? (
+          <>
+            <View style={styles.statsGrid}>
+              <StatCard
+                Icon={DashboardBuildingIcon}
+                label="Total Buildings"
+                value={stats.totalBuildings}
+              />
+              <StatCard
+                Icon={DashboardAcademicIcon}
+                label="Academic Buildings"
+                value={stats.academicBuildings}
+              />
+              <StatCard
+                Icon={DashboardAdminIcon}
+                label="Admin Buildings"
+                value={stats.adminBuildings}
+              />
+              <StatCard
+                Icon={DashboardFacilityIcon}
+                label="Facilities and Others"
+                value={stats.facilities}
+              />
+            </View>
 
-        <View style={styles.toolbar}>
-          <View style={styles.searchBox}>
-            <SearchIcon width={22} height={22} />
-            <TextInput
-              autoCapitalize="none"
-              onChangeText={setSearchQuery}
-              placeholder="Search building or room..."
-              placeholderTextColor="#9ca3af"
-              style={styles.searchInput}
-              value={searchQuery}
-            />
-          </View>
-
-          <ScrollView
-            contentContainerStyle={styles.filterList}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-          >
-            {categoryOptions.map((category) => (
-              <Pressable
-                key={category}
-                style={({ hovered, pressed }: any) => [
-                  styles.filterChip,
-                  hovered && styles.filterChipHover,
-                  selectedCategory === category && styles.filterChipActive,
-                  hovered &&
-                    selectedCategory === category &&
-                    styles.filterChipActiveHover,
-                  pressed && styles.buttonPressed,
-                ]}
-                onPress={() => setSelectedCategory(category)}
-              >
-                {category === selectedCategory ? (
-                  <FilterIcon width={14} height={14} color="#ffffff" />
-                ) : null}
-                <Text
-                  style={[
-                    styles.filterChipText,
-                    selectedCategory === category &&
-                      styles.filterChipTextActive,
-                  ]}
-                >
-                  {category}
-                </Text>
-              </Pressable>
-            ))}
-          </ScrollView>
-        </View>
-
-        <View style={styles.tableCard}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            <View style={[styles.tableInner, { width: tableContentWidth }]}>
-              <View style={[styles.tableRow, styles.tableHeader]}>
-                <Text style={[styles.tableCell, styles.nameCell]}>
-                  Building Name
-                </Text>
-                <Text style={styles.tableCell}>Category</Text>
-                <Text style={styles.tableCell}>Floors</Text>
-                <Text style={styles.tableCell}>Status</Text>
-                <Text style={styles.actionsCell}>Actions</Text>
+            <View style={styles.toolbar}>
+              <View style={styles.searchBox}>
+                <SearchIcon width={22} height={22} />
+                <TextInput
+                  autoCapitalize="none"
+                  onChangeText={setSearchQuery}
+                  placeholder="Search building or room..."
+                  placeholderTextColor="#9ca3af"
+                  style={styles.searchInput}
+                  value={searchQuery}
+                />
               </View>
 
-              {isLoadingData ? (
-                <View style={styles.loadingRow}>
-                  <Text style={styles.loadingText}>Loading admin data...</Text>
-                </View>
-              ) : (
-                filteredLocations.map((location) => (
-                  <View
-                    key={`${location.type}-${location.id}`}
-                    style={styles.tableRow}
+              <ScrollView
+                contentContainerStyle={styles.filterList}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+              >
+                {categoryOptions.map((category) => (
+                  <Pressable
+                    key={category}
+                    style={({ hovered, pressed }: any) => [
+                      styles.filterChip,
+                      hovered && styles.filterChipHover,
+                      selectedCategory === category && styles.filterChipActive,
+                      hovered &&
+                        selectedCategory === category &&
+                        styles.filterChipActiveHover,
+                      pressed && styles.buttonPressed,
+                    ]}
+                    onPress={() => setSelectedCategory(category)}
                   >
-                    <View style={styles.nameCell}>
-                      <Text style={styles.locationName}>{location.name}</Text>
-                      <Text style={styles.locationDescription} numberOfLines={1}>
-                        {location.description ?? location.nearby ?? location.type}
-                      </Text>
-                    </View>
-                    <Text style={styles.tableCell}>{location.category}</Text>
-                    <Text style={styles.tableCell}>
-                      {toEditableText(location.floors || location.floor) || "-"}
+                    {category === selectedCategory ? (
+                      <FilterIcon width={14} height={14} color="#ffffff" />
+                    ) : null}
+                    <Text
+                      style={[
+                        styles.filterChipText,
+                        selectedCategory === category &&
+                          styles.filterChipTextActive,
+                      ]}
+                    >
+                      {category}
                     </Text>
-                    <Text style={styles.tableCell}>{location.status}</Text>
-                    <View style={styles.actionsCell}>
-                      {location.type === "building" ? (
-                        <Pressable
-                          style={({ hovered, pressed }: any) => [
-                            styles.secondaryActionButton,
-                            hovered && styles.outlineButtonHover,
-                            pressed && styles.buttonPressed,
-                          ]}
-                          onPress={() => setRoomLocation(location)}
-                        >
-                          <Text style={styles.secondaryActionText}>Rooms</Text>
-                        </Pressable>
-                      ) : null}
-                      <Pressable
-                        style={({ hovered, pressed }: any) => [
-                          styles.editButton,
-                          hovered && styles.editButtonHover,
-                          pressed && styles.buttonPressed,
-                        ]}
-                        onPress={() => setEditingLocation(location)}
-                      >
-                        <DashboardEditIcon width={22} height={22} />
-                      </Pressable>
-                    </View>
-                  </View>
-                ))
-              )}
+                  </Pressable>
+                ))}
+              </ScrollView>
             </View>
-          </ScrollView>
-        </View>
+
+            <View style={styles.tableCard}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                <View style={[styles.tableInner, { width: tableContentWidth }]}>
+                  <View style={[styles.tableRow, styles.tableHeader]}>
+                    <Text style={[styles.tableCell, styles.nameCell]}>
+                      Building Name
+                    </Text>
+                    <Text style={styles.tableCell}>Category</Text>
+                    <Text style={styles.tableCell}>Floors</Text>
+                    <Text style={styles.tableCell}>Status</Text>
+                    <Text style={styles.actionsCell}>Actions</Text>
+                  </View>
+
+                  {isLoadingData ? (
+                    <View style={styles.loadingRow}>
+                      <Text style={styles.loadingText}>Loading admin data...</Text>
+                    </View>
+                  ) : (
+                    filteredLocations.map((location) => (
+                      <View
+                        key={`${location.type}-${location.id}`}
+                        style={styles.tableRow}
+                      >
+                        <View style={styles.nameCell}>
+                          <Text style={styles.locationName}>{location.name}</Text>
+                          <Text style={styles.locationDescription} numberOfLines={1}>
+                            {location.description ?? location.nearby ?? location.type}
+                          </Text>
+                        </View>
+                        <Text style={styles.tableCell}>{location.category}</Text>
+                        <Text style={styles.tableCell}>
+                          {toEditableText(location.floors || location.floor) || "-"}
+                        </Text>
+                        <Text style={styles.tableCell}>{location.status}</Text>
+                        <View style={styles.actionsCell}>
+                          {location.type === "building" ? (
+                            <Pressable
+                              style={({ hovered, pressed }: any) => [
+                                styles.secondaryActionButton,
+                                hovered && styles.outlineButtonHover,
+                                pressed && styles.buttonPressed,
+                              ]}
+                              onPress={() => setRoomLocation(location)}
+                            >
+                              <Text style={styles.secondaryActionText}>Rooms</Text>
+                            </Pressable>
+                          ) : null}
+                          <Pressable
+                            style={({ hovered, pressed }: any) => [
+                              styles.editButton,
+                              hovered && styles.editButtonHover,
+                              pressed && styles.buttonPressed,
+                            ]}
+                            onPress={() => setEditingLocation(location)}
+                          >
+                            <DashboardEditIcon width={22} height={22} />
+                          </Pressable>
+                        </View>
+                      </View>
+                    ))
+                  )}
+                </View>
+              </ScrollView>
+            </View>
+          </>
+        ) : (
+          <AdminActivityView
+            mapUpdates={activityStats.mapUpdates}
+            notifications={publishedNotifications}
+            publishedCount={activityStats.published}
+          />
+        )}
       </ScrollView>
 
       <EditLocationModal
@@ -967,6 +1040,99 @@ function StatCard({
       <View>
         <Text style={styles.statValue}>{value}</Text>
         <Text style={styles.statLabel}>{label}</Text>
+      </View>
+    </View>
+  );
+}
+
+function AdminActivityView({
+  mapUpdates,
+  notifications,
+  publishedCount,
+}: {
+  mapUpdates: number;
+  notifications: CampusNotification[];
+  publishedCount: number;
+}) {
+  return (
+    <View>
+      <View style={styles.statsGrid}>
+        <StatCard
+          Icon={DashboardFacilityIcon}
+          label="Published Notifications"
+          value={publishedCount}
+        />
+        <StatCard
+          Icon={DashboardBuildingIcon}
+          label="Map Data Updates"
+          value={mapUpdates}
+        />
+      </View>
+
+      <View style={styles.activityCard}>
+        <View style={styles.activityHeader}>
+          <View>
+            <Text style={styles.activityTitle}>Notification and Map Activity</Text>
+            <Text style={styles.activitySubtitle}>
+              Updates shown here are the same posts users can view from Home.
+            </Text>
+          </View>
+        </View>
+
+        {notifications.length ? (
+          notifications.map((notification) => {
+            const isMapUpdate = ["building", "room", "maintenance"].includes(
+              notification.category,
+            );
+
+            return (
+              <View key={notification.id} style={styles.activityItem}>
+                <View
+                  style={[
+                    styles.activityMarker,
+                    isMapUpdate && styles.activityMarkerMap,
+                  ]}
+                />
+                <View style={styles.activityBody}>
+                  <View style={styles.activityMetaRow}>
+                    <Text
+                      style={[
+                        styles.activityBadge,
+                        isMapUpdate && styles.activityBadgeMap,
+                      ]}
+                    >
+                      {isMapUpdate ? "Map Update" : "Notification"}
+                    </Text>
+                    <Text style={styles.activityTime}>
+                      {notification.timeLabel}
+                    </Text>
+                  </View>
+                  <Text style={styles.activityItemTitle}>
+                    {notification.title}
+                  </Text>
+                  <Text style={styles.activityMessage}>
+                    {notification.message}
+                  </Text>
+                  {notification.locationName ? (
+                    <Text style={styles.activityLocation}>
+                      {notification.locationName}
+                      {notification.locationSubtitle
+                        ? ` - ${notification.locationSubtitle}`
+                        : ""}
+                    </Text>
+                  ) : null}
+                </View>
+              </View>
+            );
+          })
+        ) : (
+          <View style={styles.activityEmpty}>
+            <Text style={styles.activityEmptyTitle}>No activity yet</Text>
+            <Text style={styles.activityEmptyText}>
+              Published notifications and map data edits will appear here.
+            </Text>
+          </View>
+        )}
       </View>
     </View>
   );

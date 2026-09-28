@@ -37,7 +37,13 @@ export function navigateToTab(
       router.navigate("/(tabs)/map");
       break;
     case "Search":
-      router.navigate("/(tabs)/search");
+      router.navigate({
+        pathname: "/(tabs)/search",
+        params: {
+          focusSearch: "1",
+          focusAt: Date.now().toString(),
+        },
+      });
       break;
     case "Categories":
       router.navigate("/(tabs)/categories");

@@ -75,17 +75,6 @@ type CategoryShortcut = {
   mapCategory: string;
 };
 
-const locationImages = {
-  academic: require("../../../assets/design/locations/category-academic.png"),
-  admin: require("../../../assets/design/locations/category-admin.png"),
-  cafeteria: require("../../../assets/design/locations/cafeteria.png"),
-  clinic: require("../../../assets/design/locations/clinic.png"),
-  default: require("../../../assets/design/locations/old-building.png"),
-  facilities: require("../../../assets/design/locations/category-facilities.png"),
-  library: require("../../../assets/design/locations/library.png"),
-  newBuilding: require("../../../assets/design/locations/new-building.png"),
-};
-
 const categoryPresentation = {
   Building: {
     color: "#AF2532",
@@ -157,23 +146,6 @@ function formatViewedAt(viewedAt: number) {
   return `${elapsedDays} day${elapsedDays === 1 ? "" : "s"} ago`;
 }
 
-function getLocationImage(location?: AdminLocation, item?: GuestHistoryItem) {
-  const name = `${location?.name ?? item?.name ?? ""}`.toLowerCase();
-  const category =
-    `${location?.category ?? item?.category ?? ""}`.toLowerCase();
-
-  if (name.includes("cafeteria")) return locationImages.cafeteria;
-  if (name.includes("clinic")) return locationImages.clinic;
-  if (name.includes("library")) return locationImages.library;
-  if (name.includes("new") || name.includes("building 2"))
-    return locationImages.newBuilding;
-  if (category.includes("academic")) return locationImages.academic;
-  if (category.includes("office") || category.includes("admin"))
-    return locationImages.admin;
-  if (category.includes("facilit")) return locationImages.facilities;
-  return locationImages.default;
-}
-
 function toOfficialNotification(
   notification: CampusNotification,
   readNotificationIds?: Set<string>,
@@ -198,6 +170,7 @@ export default function Home() {
   const mapPulsePrimary = useRef(new Animated.Value(0)).current;
   const mapPulseSecondary = useRef(new Animated.Value(0)).current;
   const mapPulseTertiary = useRef(new Animated.Value(0)).current;
+  const searchPressProgress = useRef(new Animated.Value(0)).current;
   const [recentItems, setRecentItems] = useState<GuestHistoryItem[]>([]);
   const [adminLocations, setAdminLocations] = useState<AdminLocation[]>([]);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
@@ -282,6 +255,25 @@ export default function Home() {
   const mapPulseTertiaryStyle = useMemo(
     () => createMapPulseStyle(mapPulseTertiary),
     [createMapPulseStyle, mapPulseTertiary],
+  );
+  const searchPressStyle = useMemo(
+    () => ({
+      transform: [
+        {
+          translateY: searchPressProgress.interpolate({
+            inputRange: [0, 1],
+            outputRange: [0, -3],
+          }),
+        },
+        {
+          scale: searchPressProgress.interpolate({
+            inputRange: [0, 1],
+            outputRange: [1, 1.025],
+          }),
+        },
+      ],
+    }),
+    [searchPressProgress],
   );
 
   useFocusEffect(
@@ -373,7 +365,47 @@ export default function Home() {
       openLimitedAccess();
       return;
     }
+    if (pathname === "/(tabs)/search") {
+      router.navigate({
+        pathname,
+        params: {
+          focusSearch: "1",
+          focusAt: Date.now().toString(),
+        },
+      });
+      return;
+    }
     router.navigate(pathname);
+  };
+
+  const animateSearchPress = (toValue: number) => {
+    Animated.spring(searchPressProgress, {
+      toValue,
+      friction: 7,
+      tension: 130,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const openSearchRoute = () => {
+    Animated.sequence([
+      Animated.spring(searchPressProgress, {
+        toValue: 1,
+        friction: 7,
+        tension: 140,
+        useNativeDriver: true,
+      }),
+      Animated.spring(searchPressProgress, {
+        toValue: 0,
+        friction: 8,
+        tension: 120,
+        useNativeDriver: true,
+      }),
+    ]).start();
+
+    setTimeout(() => {
+      openLockedRoute("/(tabs)/search");
+    }, 120);
   };
 
   const getRecentDisplayItem = (item: GuestHistoryItem) =>
@@ -384,7 +416,6 @@ export default function Home() {
 
   const recentCards: OfficialRecentItem[] = recentItems.map((item) => ({
     id: `${item.featureType}-${item.featureId}`,
-    image: getLocationImage(getRecentDisplayItem(item), item),
     name: getRecentDisplayItem(item)?.name ?? item.name,
     time: formatViewedAt(item.viewedAt),
   }));
@@ -534,14 +565,18 @@ export default function Home() {
           </Text>
           <Text style={styles.prompt}>Where do you want to go?</Text>
 
-          <Pressable
-            accessibilityRole="button"
-            style={styles.searchBox}
-            onPress={() => openLockedRoute("/(tabs)/search")}
-          >
-            <Search width={26} height={26} accessible={false} />
-            <Text style={styles.input}>Search a building or location...</Text>
-          </Pressable>
+          <Animated.View style={searchPressStyle}>
+            <Pressable
+              accessibilityRole="button"
+              style={styles.searchBox}
+              onPressIn={() => animateSearchPress(1)}
+              onPressOut={() => animateSearchPress(0)}
+              onPress={openSearchRoute}
+            >
+              <Search width={26} height={26} accessible={false} />
+              <Text style={styles.input}>Search a building or location...</Text>
+            </Pressable>
+          </Animated.View>
 
           {isGuest ? (
             <Pressable

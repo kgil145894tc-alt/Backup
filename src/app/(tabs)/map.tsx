@@ -15,7 +15,10 @@ import {
   Text,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 
 import BuildingArtwork from "../../../assets/design/backgrounds/building.svg";
 import RoomDetailsBackground from "../../../assets/design/backgrounds/elevenBg.svg";
@@ -105,6 +108,7 @@ function isLocationInsideCampus(location: CurrentMapLocation) {
 }
 
 export default function MapScreen() {
+  const insets = useSafeAreaInsets();
   const { featureId, featureType, category, locateOnly } = useLocalSearchParams<{
     featureId?: string;
     featureType?: string;
@@ -114,6 +118,8 @@ export default function MapScreen() {
   const selectedCategory =
     typeof category === "string" ? category : undefined;
   const shouldOpenInitialSheet = locateOnly !== "1";
+  const headerHeight = rs(65, 58, 68);
+  const noticeTop = insets.top + headerHeight + rs(10, 8, 12);
   const [mapFeatures, setMapFeatures] =
     useState<AdminLocation[]>(initialAdminLocations);
   const [roomEdits, setRoomEdits] = useState<Record<string, BuildingRoom>>({});
@@ -466,6 +472,7 @@ export default function MapScreen() {
             campusLocationNotice && !locationError
               ? styles.campusWarningStatus
               : null,
+            { top: noticeTop },
             { opacity: mapNoticeOpacity },
           ]}
         >
@@ -765,21 +772,19 @@ const styles = StyleSheet.create({
 
   locationStatus: {
     position: "absolute",
-    top: rs(92, 84, 98),
-    left: rs(52, 46, 58),
-    right: rs(16, 12, 18),
+    left: rs(14, 10, 18),
+    right: rs(14, 10, 18),
     paddingHorizontal: rs(12, 10, 14),
     paddingVertical: rs(8, 7, 10),
     borderRadius: rs(8, 8, 10),
     backgroundColor: "rgba(17, 24, 39, 0.82)",
-    zIndex: 5,
-    elevation: 5,
+    zIndex: 8,
+    elevation: 8,
   },
 
   campusWarningStatus: {
-    top: rs(130, 122, 138),
-    left: rs(16, 12, 18),
-    right: rs(16, 12, 18),
+    left: rs(14, 10, 18),
+    right: rs(14, 10, 18),
     backgroundColor: "rgba(175, 37, 50, 0.9)",
   },
 
@@ -787,6 +792,8 @@ const styles = StyleSheet.create({
     color: "white",
     fontSize: rf(13, 12, 14),
     fontWeight: "600",
+    lineHeight: rf(18, 16, 19),
+    textAlign: "center",
   },
 
   currentLocationButton: {

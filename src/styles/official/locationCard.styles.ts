@@ -21,6 +21,11 @@ export const styles = StyleSheet.create({
     shadowRadius: 2,
     shadowOffset: { width: 0, height: 1 },
   },
+  cardNoImage: {
+    minHeight: rs(70, 64, 76),
+    paddingHorizontal: rs(14, 12, 16),
+    paddingVertical: rs(10, 9, 12),
+  },
   // Location Photo
   photo: { width: rs(91, 72, 96), height: rs(64, 52, 68), borderRadius: 6 },
   // Text Placement
