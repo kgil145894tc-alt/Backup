@@ -149,6 +149,10 @@ export default function MapScreen() {
     useState(0);
   const mapNoticeOpacity = useRef(new Animated.Value(0)).current;
   const buildingSheetProgress = useRef(new Animated.Value(1)).current;
+  const currentLocationAccuracy =
+    Platform.OS === "android"
+      ? Location.Accuracy.Balanced
+      : Location.Accuracy.BestForNavigation;
 
   const campusLocationNotice = useMemo(() => {
     if (!currentLocation) {
@@ -379,7 +383,7 @@ export default function MapScreen() {
         }
 
         const position = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.BestForNavigation,
+          accuracy: currentLocationAccuracy,
         });
 
         if (!isMounted) {
@@ -394,9 +398,9 @@ export default function MapScreen() {
 
         locationSubscription = await Location.watchPositionAsync(
           {
-            accuracy: Location.Accuracy.BestForNavigation,
-            distanceInterval: 1,
-            timeInterval: 1000,
+            accuracy: currentLocationAccuracy,
+            distanceInterval: Platform.OS === "android" ? 5 : 1,
+            timeInterval: Platform.OS === "android" ? 3000 : 1000,
           },
           (updatedPosition) => {
             setCurrentLocation({
@@ -423,7 +427,7 @@ export default function MapScreen() {
       isMounted = false;
       locationSubscription?.remove();
     };
-  }, []);
+  }, [currentLocationAccuracy]);
 
   return (
     <View style={styles.container}>

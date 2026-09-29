@@ -258,7 +258,7 @@ export default function SearchScreen() {
               showsVerticalScrollIndicator={false}
               renderItem={({ item }) => (
                 <OfficialLocationCard
-                  hideImage={!searchTerm}
+                  hideImage
                   item={toLocationCardItem(item)}
                   onPress={() => openFeature(item)}
                 />

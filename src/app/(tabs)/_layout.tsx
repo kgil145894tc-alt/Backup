@@ -12,7 +12,6 @@ import { watchUserSession } from "../../services/userAuth";
 import {
   clearStoredUserSession,
   getAppAccessMode,
-  getStoredUserSession,
   isGuestMode,
   setAppAccessMode,
   setStoredUserSession,
@@ -27,42 +26,32 @@ export default function TabLayout() {
   useFocusEffect(
     useCallback(() => {
       let isActive = true;
-      let localMode: AppAccessMode = "guest";
-      let hasStoredSession = false;
       let unsubscribe = () => {};
 
-      void Promise.all([getAppAccessMode(), getStoredUserSession()]).then(
-        ([mode, storedSession]) => {
+      void getAppAccessMode().then((mode) => {
+        if (!isActive) {
+          return;
+        }
+
+        setAccessMode(mode);
+
+        unsubscribe = watchUserSession((session) => {
           if (!isActive) {
             return;
           }
 
-          localMode = mode;
-          hasStoredSession = Boolean(storedSession);
-          setAccessMode(mode);
+          if (session) {
+            setAccessMode("user");
+            void setStoredUserSession(session);
+            void setAppAccessMode("user");
+            return;
+          }
 
-          unsubscribe = watchUserSession((session) => {
-            if (!isActive) {
-              return;
-            }
-
-            if (session) {
-              setAccessMode("user");
-              void setStoredUserSession(session);
-              void setAppAccessMode("user");
-              return;
-            }
-
-            if (localMode === "user" && hasStoredSession) {
-              return;
-            }
-
-            setAccessMode("guest");
-            void clearStoredUserSession();
-            void setAppAccessMode("guest");
-          });
-        },
-      );
+          setAccessMode("guest");
+          void clearStoredUserSession();
+          void setAppAccessMode("guest");
+        });
+      });
 
       return () => {
         isActive = false;

@@ -14,9 +14,11 @@ import WelcomeBackground from "../../assets/design/backgrounds/firstBg.svg";
 import TitleDivider from "../../assets/design/icons/arrow.svg";
 import StartArrow from "../../assets/design/icons/start-arrow.svg";
 import {
-  getAppAccessMode,
-  getStoredUserSession,
+  clearStoredUserSession,
+  setAppAccessMode,
+  setStoredUserSession,
 } from "../utils/appSession";
+import { getCurrentUserSession } from "../services/userAuth";
 import { styles } from "../styles/official/welcomeScreen.styles";
 
 const logo = require("../../assets/design/logos/UMVC-Find.png");
@@ -28,19 +30,20 @@ export default function WelcomeScreen() {
     useCallback(() => {
       let isActive = true;
 
-      void Promise.all([
-        getAppAccessMode(),
-        getStoredUserSession(),
-      ]).then(([mode, session]) => {
+      void getCurrentUserSession().then((session) => {
         if (!isActive) {
           return;
         }
 
-        if (mode === "user" && session?.uid) {
+        if (session?.uid) {
+          void setStoredUserSession(session);
+          void setAppAccessMode("user");
           router.replace("/(tabs)");
           return;
         }
 
+        void clearStoredUserSession();
+        void setAppAccessMode("guest");
         setIsCheckingSession(false);
       });
 

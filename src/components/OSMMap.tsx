@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, type ElementRef } from "react";
+import { Platform } from "react-native";
 import { WebView } from "react-native-webview";
 import benchesData from "@/data/benches.json";
 import buildingsData from "@/data/buildings.json";
@@ -42,6 +43,7 @@ export default function OSMMap({
   onMapReady,
 }: OSMMapProps) {
   const webViewRef = useRef<ElementRef<typeof WebView>>(null);
+  const isAndroid = Platform.OS === "android";
 
   const boundaryCoordinates = campusBoundary
     .map((point) => `[${point.latitude}, ${point.longitude}]`)
@@ -102,7 +104,7 @@ export default function OSMMap({
 
           .leaflet-tile-pane {
             opacity: 0.12;
-            filter: saturate(0.55) contrast(0.85) brightness(1.12);
+            filter: ${isAndroid ? "none" : "saturate(0.55) contrast(0.85) brightness(1.12)"};
           }
 
           .leaflet-overlay-pane svg path {
@@ -114,11 +116,11 @@ export default function OSMMap({
           }
 
           .campus-building-shape {
-            filter: drop-shadow(0 4px 3px rgba(71, 35, 41, 0.26));
+            filter: ${isAndroid ? "none" : "drop-shadow(0 4px 3px rgba(71, 35, 41, 0.26))"};
           }
 
           .campus-location-shape {
-            filter: drop-shadow(0 2px 2px rgba(63, 58, 44, 0.16));
+            filter: ${isAndroid ? "none" : "drop-shadow(0 2px 2px rgba(63, 58, 44, 0.16))"};
           }
 
           .campus-map-label {
@@ -235,17 +237,33 @@ export default function OSMMap({
           }
 
           .campus-selected-marker .pin-shadow {
-            animation: campus-marker-shadow 1.05s ease-in-out infinite;
             background: rgba(92, 12, 20, 0.28);
             border-radius: 50%;
             bottom: 5px;
-            filter: blur(2px);
+            filter: ${isAndroid ? "none" : "blur(2px)"};
             height: 8px;
             left: 22px;
             position: absolute;
             width: 30px;
             z-index: 1;
           }
+
+          ${isAndroid ? `
+          .campus-selected-marker::before,
+          .campus-selected-marker::after,
+          .campus-selected-marker .pulse-ring {
+            display: none;
+          }
+
+          .campus-selected-marker .pin-wrap,
+          .campus-selected-marker .pin-shadow {
+            animation: none;
+          }
+          ` : `
+          .campus-selected-marker .pin-shadow {
+            animation: campus-marker-shadow 1.05s ease-in-out infinite;
+          }
+          `}
 
           .campus-selected-marker .pin-body {
             background: linear-gradient(145deg, #ff463f 0%, #dc1128 58%, #a70d1d 100%);
@@ -337,6 +355,10 @@ export default function OSMMap({
             touchRotate: false,
             rotateControl: false,
             zoomControl: false,
+            preferCanvas: ${JSON.stringify(isAndroid)},
+            zoomAnimation: ${JSON.stringify(!isAndroid)},
+            fadeAnimation: ${JSON.stringify(!isAndroid)},
+            markerZoomAnimation: ${JSON.stringify(!isAndroid)},
             maxBoundsViscosity: 0.25
           }).setView(
             [7.4259, 125.7939],
@@ -543,13 +565,73 @@ const benchCollection =
            * Location / room style
            */
 
-          const locationStyle = {
-          color: "#f3ead4",
-          className: "campus-location-shape",
-          weight: 2,
-          fillColor: "#efe2c5",
-          fillOpacity: 0.9
-        }
+          const roomPalette = {
+            classroom: "#7CC7E8",
+            laboratory: "#5FD0B5",
+            office: "#F2B84B",
+            library: "#A78BFA",
+            restroom: "#67E8F9",
+            food: "#F97373",
+            facility: "#22C55E",
+            restricted: "#EF6B6B",
+            hallway: "#E5E7EB"
+          };
+
+          function getLocationFillColor(feature) {
+            const properties = getMergedProperties(feature);
+            const name = String(properties.name || "").toLowerCase();
+            const category = String(properties.category || "").toLowerCase();
+            const type = String(properties.type || "").toLowerCase();
+
+            if (
+              name === "cr" ||
+              name.includes("restroom") ||
+              name.includes("comfort room")
+            ) {
+              return roomPalette.restroom;
+            }
+
+            if (name.includes("library") || name.includes("learning and information")) {
+              return roomPalette.library;
+            }
+
+            if (category === "laboratory" || type === "laboratory") {
+              return roomPalette.laboratory;
+            }
+
+            if (
+              category === "office" ||
+              category === "faculty" ||
+              type === "office" ||
+              type === "faculty"
+            ) {
+              return roomPalette.office;
+            }
+
+            if (category === "food" || type === "food") {
+              return roomPalette.food;
+            }
+
+            if (category === "security" || name.includes("guard")) {
+              return roomPalette.restricted;
+            }
+
+            if (category === "facility" || type === "facility") {
+              return roomPalette.facility;
+            }
+
+            return roomPalette.classroom;
+          }
+
+          function getLocationStyle(feature) {
+            return {
+              color: "#ffffff",
+              className: "campus-location-shape",
+              weight: 2,
+              fillColor: getLocationFillColor(feature),
+              fillOpacity: 0.88
+            };
+          }
       
 
           function getMapFeatureStyle(feature) {
@@ -558,9 +640,9 @@ const benchCollection =
             switch (type) {
               case "hallway":
                 return {
-                  color: "#f5f1df",
+                  color: "#ffffff",
                   weight: 2,
-                  fillColor: "#f4f0dc",
+                  fillColor: roomPalette.hallway,
                   fillOpacity: 0.95
                 };
               case "court":
@@ -991,12 +1073,14 @@ const benchCollection =
               filter: function (feature) {
                 return !isHiddenFeature(feature);
               },
-              style: locationStyle,
+              style: getLocationStyle,
 
               onEachFeature: function (
                 feature,
                 layer
               ) {
+                const locationStyle = getLocationStyle(feature);
+
                 bindFeature(
                   feature,
                   layer,
@@ -1122,17 +1206,20 @@ const benchCollection =
       </body>
     </html>
   `,
-    [boundaryCoordinates, controlsTopOffset, featureOverrides, hiddenFeatureKeys, openSelectedPopup, selectedCategory, selectedFeatureId, selectedFeatureType],
+    [boundaryCoordinates, controlsTopOffset, featureOverrides, hiddenFeatureKeys, isAndroid, openSelectedPopup, selectedCategory, selectedFeatureId, selectedFeatureType],
   );
+
+  const source = useMemo(() => ({ html }), [html]);
 
   return (
     <WebView
       ref={webViewRef}
-      source={{ html }}
+      source={source}
       style={{ flex: 1 }}
       originWhitelist={["*"]}
       javaScriptEnabled={true}
       domStorageEnabled={true}
+      androidLayerType="hardware"
       scrollEnabled={false}
       onLoadEnd={() => {
         if (!currentLocation) {

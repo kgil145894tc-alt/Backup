@@ -31,6 +31,9 @@ export async function getReadNotificationIds() {
       ...localReadIds,
       ...firestoreReadIds,
     ]);
+    const localOnlyReadIds = [...localReadIds].filter(
+      (id) => !firestoreReadIds.has(id),
+    );
 
     if (mergedReadIds.size !== localReadIds.size) {
       await AsyncStorage.setItem(
@@ -38,6 +41,8 @@ export async function getReadNotificationIds() {
         JSON.stringify([...mergedReadIds]),
       );
     }
+
+    await syncReadNotificationIds(userSession.uid, localOnlyReadIds);
 
     return mergedReadIds;
   } catch {
@@ -67,6 +72,17 @@ export async function markNotificationRead(notificationId: string) {
   }
 
   return readIds;
+}
+
+async function syncReadNotificationIds(
+  userId: string,
+  notificationIds: string[],
+) {
+  await Promise.all(
+    notificationIds.map((notificationId) =>
+      markUserNotificationRead(userId, notificationId),
+    ),
+  );
 }
 
 async function getLocalReadNotificationIds(storageKey: string) {

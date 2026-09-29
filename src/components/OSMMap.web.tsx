@@ -513,13 +513,73 @@ export default function OSMMap({
             fillOpacity: 0.96
           };
 
-          const locationStyle = {
-            color: "#f3ead4",
-            className: "campus-location-shape",
-            weight: 2,
-            fillColor: "#efe2c5",
-            fillOpacity: 0.9
+          const roomPalette = {
+            classroom: "#7CC7E8",
+            laboratory: "#5FD0B5",
+            office: "#F2B84B",
+            library: "#A78BFA",
+            restroom: "#67E8F9",
+            food: "#F97373",
+            facility: "#22C55E",
+            restricted: "#EF6B6B",
+            hallway: "#E5E7EB"
           };
+
+          function getLocationFillColor(feature) {
+            const properties = getMergedProperties(feature);
+            const name = String(properties.name || "").toLowerCase();
+            const category = String(properties.category || "").toLowerCase();
+            const type = String(properties.type || "").toLowerCase();
+
+            if (
+              name === "cr" ||
+              name.includes("restroom") ||
+              name.includes("comfort room")
+            ) {
+              return roomPalette.restroom;
+            }
+
+            if (name.includes("library") || name.includes("learning and information")) {
+              return roomPalette.library;
+            }
+
+            if (category === "laboratory" || type === "laboratory") {
+              return roomPalette.laboratory;
+            }
+
+            if (
+              category === "office" ||
+              category === "faculty" ||
+              type === "office" ||
+              type === "faculty"
+            ) {
+              return roomPalette.office;
+            }
+
+            if (category === "food" || type === "food") {
+              return roomPalette.food;
+            }
+
+            if (category === "security" || name.includes("guard")) {
+              return roomPalette.restricted;
+            }
+
+            if (category === "facility" || type === "facility") {
+              return roomPalette.facility;
+            }
+
+            return roomPalette.classroom;
+          }
+
+          function getLocationStyle(feature) {
+            return {
+              color: "#ffffff",
+              className: "campus-location-shape",
+              weight: 2,
+              fillColor: getLocationFillColor(feature),
+              fillOpacity: 0.88
+            };
+          }
 
 
           function getMapFeatureStyle(feature) {
@@ -528,9 +588,9 @@ export default function OSMMap({
             switch (type) {
               case "hallway":
                 return {
-                  color: "#f5f1df",
+                  color: "#ffffff",
                   weight: 2,
-                  fillColor: "#f4f0dc",
+                  fillColor: roomPalette.hallway,
                   fillOpacity: 0.95
                 };
               case "court":
@@ -922,8 +982,10 @@ export default function OSMMap({
               filter: function (feature) {
                 return !isHiddenFeature(feature);
               },
-              style: locationStyle,
+              style: getLocationStyle,
               onEachFeature: function (feature, layer) {
+                const locationStyle = getLocationStyle(feature);
+
                 bindFeature(feature, layer, locationStyle);
                 const properties = getMergedProperties(feature);
 

@@ -42,6 +42,7 @@ export const styles = StyleSheet.create({
 
   loginContainerCompact: {
     flexDirection: "column",
+    flexGrow: 1,
     minHeight: 0,
   },
 
@@ -221,10 +222,12 @@ export const styles = StyleSheet.create({
     overflow: "hidden",
     paddingHorizontal: 48,
     paddingVertical: 70,
+    position: "relative",
   },
 
   loginPanelCompact: {
-    flex: 0,
+    flexGrow: 1,
+    flexShrink: 0,
     paddingHorizontal: 28,
     paddingVertical: 42,
   },
@@ -237,12 +240,15 @@ export const styles = StyleSheet.create({
   loginFormBackground: {
     ...StyleSheet.absoluteFill,
     opacity: 0.5,
+    zIndex: 0,
   },
 
   loginForm: {
     alignSelf: "center",
     maxWidth: 710,
+    position: "relative",
     width: "100%",
+    zIndex: 1,
   },
 
   loginFormNarrow: {

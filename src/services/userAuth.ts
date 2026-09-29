@@ -140,6 +140,43 @@ export async function signOutUser() {
   }
 }
 
+export function getCurrentUserSession() {
+  return new Promise<AppUserSession | null>((resolve) => {
+    if (!firebaseAuth) {
+      resolve(null);
+      return;
+    }
+
+    const auth = firebaseAuth;
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      unsubscribe();
+
+      if (!user) {
+        resolve(null);
+        return;
+      }
+
+      if (!isAllowedUserEmail(user.email)) {
+        void getUserRole(user.uid)
+          .then((role) => {
+            if (role !== "admin") {
+              void signOut(auth);
+            }
+
+            resolve(null);
+          })
+          .catch(() => {
+            void signOut(auth);
+            resolve(null);
+          });
+        return;
+      }
+
+      resolve(toAppUserSession(user));
+    });
+  });
+}
+
 export function watchUserSession(
   onSession: (session: AppUserSession | null) => void,
 ) {
