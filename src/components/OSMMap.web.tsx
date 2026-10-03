@@ -35,6 +35,7 @@ export default function OSMMap({
   onMapReady,
 }: OSMMapProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const lastCurrentLocationFocusRequest = useRef(currentLocationFocusRequest);
 
   const boundaryCoordinates = campusBoundary
     .map((point) => `[${point.latitude}, ${point.longitude}]`)
@@ -74,9 +75,15 @@ export default function OSMMap({
   }, [currentLocation]);
 
   useEffect(() => {
-    if (!currentLocation || currentLocationFocusRequest === 0) {
+    if (
+      !currentLocation ||
+      currentLocationFocusRequest === 0 ||
+      currentLocationFocusRequest === lastCurrentLocationFocusRequest.current
+    ) {
       return;
     }
+
+    lastCurrentLocationFocusRequest.current = currentLocationFocusRequest;
 
     iframeRef.current?.contentWindow?.postMessage(
       {
@@ -372,6 +379,21 @@ export default function OSMMap({
             map.fitBounds(bounds, focusOptions);
           }
 
+          function smoothFocusCenter(center, zoom) {
+            const focusOptions = {
+              animate: true,
+              duration: 0.75,
+              easeLinearity: 0.25
+            };
+
+            if (map.flyTo) {
+              map.flyTo(center, zoom, focusOptions);
+              return;
+            }
+
+            map.setView(center, zoom, focusOptions);
+          }
+
           L.tileLayer(
             "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
             {
@@ -466,6 +488,7 @@ export default function OSMMap({
           const roomLabelLayers = [];
           const roomLabelMinZoom = 20;
           let activeFeatureKey = selectedFeatureKey;
+          let pendingSelectedMarker = null;
 
           function getFeatureKey(feature) {
             const properties = feature.properties || {};
@@ -806,6 +829,61 @@ export default function OSMMap({
             }
           }
 
+          function addPendingSelectedMarker() {
+            if (!pendingSelectedMarker) {
+              return;
+            }
+
+            const addMarker = pendingSelectedMarker;
+            pendingSelectedMarker = null;
+            addMarker();
+          }
+
+          function addSelectedMarkerAfterFocus(delayMs) {
+            if (!pendingSelectedMarker) {
+              return;
+            }
+
+            let fallbackId = null;
+            let startFallbackId = null;
+            let isComplete = false;
+
+            function handleFocusEnd() {
+              if (isComplete) {
+                return;
+              }
+
+              isComplete = true;
+              map.off("movestart", handleFocusStart);
+              map.off("moveend", handleFocusEnd);
+
+              if (fallbackId) {
+                clearTimeout(fallbackId);
+              }
+
+              if (startFallbackId) {
+                clearTimeout(startFallbackId);
+              }
+
+              addPendingSelectedMarker();
+            }
+
+            function handleFocusStart() {
+              if (startFallbackId) {
+                clearTimeout(startFallbackId);
+              }
+
+              map.once("moveend", handleFocusEnd);
+              fallbackId = setTimeout(handleFocusEnd, delayMs);
+            }
+
+            map.once("movestart", handleFocusStart);
+            startFallbackId = setTimeout(function () {
+              map.off("movestart", handleFocusStart);
+              fallbackId = setTimeout(handleFocusEnd, delayMs);
+            }, 120);
+          }
+
           function bindFeature(feature, layer, defaultStyle) {
             const properties = getMergedProperties(feature);
             const featureKey =
@@ -844,19 +922,21 @@ export default function OSMMap({
               layer.setStyle(selectedStyle);
 
               if (!openSelectedPopup && layer.getBounds) {
-                const marker = L.marker(
-                  layer.getBounds().getCenter(),
-                  {
-                    icon: categoryMarkerIcon,
-                    pane: "selected-marker-pane",
-                    zIndexOffset: 9000
-                  }
-                ).addTo(map);
+                pendingSelectedMarker = function () {
+                  const marker = L.marker(
+                    layer.getBounds().getCenter(),
+                    {
+                      icon: categoryMarkerIcon,
+                      pane: "selected-marker-pane",
+                      zIndexOffset: 9000
+                    }
+                  ).addTo(map);
 
-                marker.on("click", function () {
-                  postSelectedFeature(properties);
-                  selectFeatureLayer(featureKey);
-                });
+                  marker.on("click", function () {
+                    postSelectedFeature(properties);
+                    selectFeatureLayer(featureKey);
+                  });
+                };
               }
             }
 
@@ -1017,43 +1097,55 @@ export default function OSMMap({
             }
 
             if (selectedFeature.layer.getBounds) {
-              smoothFocusBounds(
-                selectedFeature.layer.getBounds(),
-                {
-                  padding: [60, 60],
-                  maxZoom: 20
-                }
-              );
+              const selectedBounds = selectedFeature.layer.getBounds();
+              if (selectedFeatureType === "building") {
+                addSelectedMarkerAfterFocus(2200);
+                smoothFocusBounds(
+                  selectedBounds,
+                  {
+                    padding: [60, 60],
+                    maxZoom: 20
+                  }
+                );
+              } else {
+                addSelectedMarkerAfterFocus(1800);
+                smoothFocusCenter(selectedBounds.getCenter(), 20);
+              }
+            } else {
+              addPendingSelectedMarker();
             }
 
+          }
+
+          function applyDefaultCampusView() {
+            map.fitBounds(
+              campusBounds,
+              {
+                padding: [8, 8],
+                maxZoom: 20,
+                animate: false
+              }
+            );
+
+            map.setZoom(
+              Math.min(map.getZoom() + 1, 21),
+              {
+                animate: false
+              }
+            );
           }
 
           function focusSelectedCategory() {
             if (!selectedCategory || !categoryFeatureBounds.length) {
               return;
             }
-
-            const bounds = categoryFeatureBounds.reduce(
-              function (nextBounds, featureBounds) {
-                return nextBounds.extend(featureBounds);
-              },
-              L.latLngBounds(
-                categoryFeatureBounds[0].getSouthWest(),
-                categoryFeatureBounds[0].getNorthEast()
-              )
-            );
-
-            smoothFocusBounds(
-              bounds,
-              {
-                padding: [70, 70],
-                maxZoom: 20
-              }
-            );
           }
 
           setTimeout(() => {
-            map.invalidateSize();
+            map.invalidateSize({
+              animate: false,
+              pan: false
+            });
 
             map.setMaxBounds(
               paddedCampusBounds
@@ -1070,35 +1162,32 @@ export default function OSMMap({
               )
             );
 
-            map.fitBounds(
-              campusBounds,
-              {
-                padding: [8, 8],
-                maxZoom: 20
-              }
-            );
-
-            map.setZoom(
-              Math.min(map.getZoom() + 1, 21)
-            );
-
             if (map.setBearing) {
               map.setBearing(${mapBearing});
             }
 
             updateRoomLabels();
             if (selectedFeatureKey) {
-              focusSelectedFeature();
+              applyDefaultCampusView();
+              requestAnimationFrame(function () {
+                focusSelectedFeature();
+                window.parent.postMessage(
+                  {
+                    event: "map-ready"
+                  },
+                  "*"
+                );
+              });
             } else {
+              applyDefaultCampusView();
               focusSelectedCategory();
+              window.parent.postMessage(
+                {
+                  event: "map-ready"
+                },
+                "*"
+              );
             }
-
-            window.parent.postMessage(
-              {
-                event: "map-ready"
-              },
-              "*"
-            );
           }, 500);
         </script>
       </body>

@@ -7,7 +7,6 @@ import {
   useMemo,
   useRef,
   useState,
-  type ComponentProps,
   type ComponentType,
 } from "react";
 import {
@@ -20,6 +19,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import type { SvgProps } from "react-native-svg";
 
 import LimitedAccessModal from "@/components/LimitedAccessModal";
 import {
@@ -32,16 +32,16 @@ import {
 } from "@/components/OfficialDesign";
 import { navigateToTab } from "@/utils/navigation";
 import Background from "../../../assets/design/backgrounds/thirdBg.svg";
-import AcademicIcon from "../../../assets/design/icons/academic.svg";
 import CampusMap from "../../../assets/design/icons/campusMap.svg";
-import FacilitiesIcon from "../../../assets/design/icons/facilities.svg";
-import FoodIcon from "../../../assets/design/icons/food.svg";
 import MoreIcon from "../../../assets/design/icons/more.svg";
 import Bell from "../../../assets/design/icons/notification.svg";
-import OfficesIcon from "../../../assets/design/icons/offices.svg";
 import Arrow from "../../../assets/design/icons/proceed-arrow.svg";
 import Search from "../../../assets/design/icons/seacrch.svg";
-import ServicesIcon from "../../../assets/design/icons/services.svg";
+import {
+  fallbackHomeCategoryPresentation,
+  homeCategoryPresentation,
+  sortCategoriesByPreferredOrder,
+} from "../../constants/campusPresentation";
 import { type CampusNotification } from "../../data/notifications";
 import { loadCampusData } from "../../services/campusDataStore";
 import { subscribeToNotifications } from "../../services/notificationStore";
@@ -66,7 +66,7 @@ import {
 const universitySeal = require("../../../assets/design/logos/UM.png");
 
 type CategoryShortcut = {
-  Icon: ComponentType<ComponentProps<typeof AcademicIcon>>;
+  Icon: ComponentType<SvgProps>;
   color: string;
   count: number;
   isMore?: boolean;
@@ -74,59 +74,6 @@ type CategoryShortcut = {
   title: string;
   mapCategory: string;
 };
-
-const categoryPresentation = {
-  Building: {
-    color: "#AF2532",
-    Icon: MoreIcon,
-    light: true,
-  },
-  Facility: {
-    color: "#FAE7E9",
-    Icon: FacilitiesIcon,
-  },
-  Faculty: {
-    color: "#F0E7FA",
-    Icon: AcademicIcon,
-  },
-  Food: {
-    color: "#FAF2DD",
-    Icon: FoodIcon,
-  },
-  Laboratory: {
-    color: "#E6F1FF",
-    Icon: AcademicIcon,
-  },
-  Office: {
-    color: "#FED257",
-    Icon: OfficesIcon,
-  },
-  Room: {
-    color: "#AA2A37",
-    Icon: AcademicIcon,
-    light: true,
-  },
-  Security: {
-    color: "#E8EEF1",
-    Icon: ServicesIcon,
-  },
-};
-
-const fallbackCategoryPresentation = {
-  color: "#FAF2DD",
-  Icon: MoreIcon,
-};
-
-const preferredCategoryOrder = [
-  "Building",
-  "Room",
-  "Laboratory",
-  "Faculty",
-  "Office",
-  "Facility",
-  "Food",
-  "Security",
-];
 
 function formatViewedAt(viewedAt: number) {
   const elapsedMs = Date.now() - viewedAt;
@@ -167,10 +114,10 @@ export default function Home() {
   const scrollRef = useRef<ScrollView>(null);
   const openAllAfterClose = useRef(false);
   const pendingNotification = useRef<CampusNotification | null>(null);
-  const mapPulsePrimary = useRef(new Animated.Value(0)).current;
-  const mapPulseSecondary = useRef(new Animated.Value(0)).current;
-  const mapPulseTertiary = useRef(new Animated.Value(0)).current;
-  const searchPressProgress = useRef(new Animated.Value(0)).current;
+  const [mapPulsePrimary] = useState(() => new Animated.Value(0));
+  const [mapPulseSecondary] = useState(() => new Animated.Value(0));
+  const [mapPulseTertiary] = useState(() => new Animated.Value(0));
+  const [searchPressProgress] = useState(() => new Animated.Value(0));
   const [recentItems, setRecentItems] = useState<GuestHistoryItem[]>([]);
   const [adminLocations, setAdminLocations] = useState<AdminLocation[]>([]);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
@@ -427,25 +374,12 @@ export default function Home() {
       counts.set(location.category, (counts.get(location.category) ?? 0) + 1);
     });
 
-    const topCategories = [...counts.keys()]
-      .sort((first, second) => {
-        const firstIndex = preferredCategoryOrder.indexOf(first);
-        const secondIndex = preferredCategoryOrder.indexOf(second);
-
-        if (firstIndex !== -1 || secondIndex !== -1) {
-          return (
-            (firstIndex === -1 ? Number.MAX_SAFE_INTEGER : firstIndex) -
-            (secondIndex === -1 ? Number.MAX_SAFE_INTEGER : secondIndex)
-          );
-        }
-
-        return first.localeCompare(second);
-      })
+    const topCategories = sortCategoriesByPreferredOrder([...counts.keys()])
       .slice(0, 5)
       .map((category) => {
         const presentation =
-          categoryPresentation[category as keyof typeof categoryPresentation] ??
-          fallbackCategoryPresentation;
+          homeCategoryPresentation[category] ??
+          fallbackHomeCategoryPresentation;
 
         return {
           title: category,
@@ -543,7 +477,7 @@ export default function Home() {
             style={styles.iconButton}
             onPress={openNotifications}
           >
-            <Bell width={32} height={32} accessible={false} />
+            <Bell width={32} height={32} />
             {!isGuest && unreadNotificationCount > 0 ? (
               <View style={styles.notificationBadge}>
                 <Text style={styles.notificationBadgeText}>
@@ -573,7 +507,7 @@ export default function Home() {
               onPressOut={() => animateSearchPress(0)}
               onPress={openSearchRoute}
             >
-              <Search width={26} height={26} accessible={false} />
+              <Search width={26} height={26} />
               <Text style={styles.input}>Search a building or location...</Text>
             </Pressable>
           </Animated.View>
@@ -600,7 +534,7 @@ export default function Home() {
                   style={[styles.mapPulseCircle, mapPulseTertiaryStyle]}
                 />
                 <View style={styles.mapPulseCore}>
-                  <CampusMap width={30} height={30} accessible={false} />
+                  <CampusMap width={30} height={30} />
                 </View>
               </View>
               <View style={styles.mapCopy}>
@@ -609,7 +543,7 @@ export default function Home() {
                   View the interactive map and start exploring!
                 </Text>
               </View>
-              <Arrow width={21} height={25} color="white" accessible={false} />
+              <Arrow width={21} height={25} color="white" />
             </Pressable>
           ) : (
             <>
@@ -626,7 +560,6 @@ export default function Home() {
                       width={14}
                       height={16}
                       color="#AF2532"
-                      accessible={false}
                     />
                   </Pressable>
                 ) : null}
@@ -664,7 +597,7 @@ export default function Home() {
                       pressed && styles.pressed,
                     ]}
                   >
-                    <Icon width={30} height={30} accessible={false} />
+                    <Icon width={30} height={30} />
                     <View style={styles.tileCopy}>
                       <Text
                         style={[styles.tileText, light && styles.white]}
@@ -710,7 +643,7 @@ export default function Home() {
                   style={[styles.mapPulseCircle, mapPulseTertiaryStyle]}
                 />
                 <View style={styles.mapPulseCore}>
-                  <CampusMap width={30} height={30} accessible={false} />
+                  <CampusMap width={30} height={30} />
                 </View>
               </View>
               <View style={styles.mapCopy}>
@@ -719,7 +652,7 @@ export default function Home() {
                   View the interactive map and start exploring!
                 </Text>
               </View>
-              <Arrow width={21} height={25} color="white" accessible={false} />
+              <Arrow width={21} height={25} color="white" />
             </Pressable>
           ) : null}
         </ScrollView>

@@ -32,7 +32,7 @@ export default function OfficialPage({
             }
             style={styles.backButton}
           >
-            <BackArrow width={32} height={32} accessible={false} />
+            <BackArrow width={32} height={32} />
           </Pressable>
           <View style={styles.copy}>
             <Text style={styles.title}>{title}</Text>

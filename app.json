@@ -2,6 +2,7 @@
   "expo": {
     "name": "UMVCFIND",
     "slug": "UMVCFIND",
+    "owner": "kirl123s-team",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/design/logos/UMVC-Find.png",
@@ -56,7 +57,7 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "99768ba9-f192-4591-b62a-457b51b55d50"
+        "projectId": "aa35b827-5bb1-4c6f-a213-295c08b01f2d"
       }
     }
   }

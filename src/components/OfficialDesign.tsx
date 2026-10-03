@@ -65,7 +65,6 @@ export function OfficialBottomNavigation({
     const showEvent = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
     const show = Keyboard.addListener(showEvent, () => setKeyboardVisible(true));
     const hide = Keyboard.addListener("keyboardDidHide", () => setKeyboardVisible(false));
-    setKeyboardVisible(Keyboard.isVisible());
     return () => {
       show.remove();
       hide.remove();
@@ -98,7 +97,6 @@ export function OfficialBottomNavigation({
                   width={isCompact ? 34 : 42}
                   height={isCompact ? 32 : 38}
                   color={selected ? "#A42330" : "#6C757D"}
-                  accessible={false}
                 />
                 <Text
                   numberOfLines={1}
@@ -182,12 +180,12 @@ export function OfficialRecentLocations({
                       ]}
                     >
                       <View style={recentStyles.timeRow}>
-                        <DateIcon width={15} height={15} accessible={false} />
+                        <DateIcon width={15} height={15} />
                         <Text style={recentStyles.time}>{item.time}</Text>
                       </View>
                       <View style={recentStyles.footer}>
                         <Text style={recentStyles.name}>{item.name}</Text>
-                        <Arrow width={18} height={22} color="#AF2532" accessible={false} />
+                        <Arrow width={18} height={22} color="#AF2532" />
                       </View>
                     </Pressable>
                   );
@@ -269,7 +267,7 @@ export function OfficialLocationCard({
           </Text>
         ) : null}
       </View>
-      <Arrow width={21} height={25} color="#6C757D" accessible={false} />
+      <Arrow width={21} height={25} color="#6C757D" />
     </Pressable>
   );
 }
@@ -306,7 +304,7 @@ export function OfficialCategoryCard({
       ]}
     >
       <View style={categoryCardStyles.details}>
-        <Icon width={iconSize} height={iconSize} accessible={false} />
+        <Icon width={iconSize} height={iconSize} />
         <Text
           numberOfLines={2}
           adjustsFontSizeToFit
@@ -346,14 +344,14 @@ export function OfficialProfileActionCard({
       onPress={onPress}
       style={({ pressed }) => [profileActionStyles.card, pressed && profileActionStyles.pressed]}
     >
-      <Icon width={65} height={64} accessible={false} />
+      <Icon width={65} height={64} />
       <View style={profileActionStyles.copy}>
         <Text style={[profileActionStyles.title, profileActionStyles.font]}>{title}</Text>
         <Text style={[profileActionStyles.description, profileActionStyles.font]}>
           {description}
         </Text>
       </View>
-      <Arrow width={21} height={25} color="#6C757D" accessible={false} />
+      <Arrow width={21} height={25} color="#6C757D" />
     </Pressable>
   );
 }
@@ -400,7 +398,7 @@ export function OfficialNotificationCard({
           {item.time}
         </Text>
       </View>
-      <Arrow width={21} height={25} color="#B6B8BA" accessible={false} />
+      <Arrow width={21} height={25} color="#B6B8BA" />
     </Pressable>
   );
 }
@@ -421,13 +419,23 @@ export function OfficialNotificationSheet({
   visible: boolean;
 }) {
   const [mounted, setMounted] = useState(visible);
-  const progress = useRef(new Animated.Value(0)).current;
+  const [progress] = useState(() => new Animated.Value(0));
   const { height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
 
   useEffect(() => {
-    if (visible) {
-      setMounted(true);
+    if (!visible || mounted) {
+      return;
+    }
+
+    const timeout = setTimeout(() => setMounted(true), 0);
+
+    return () => clearTimeout(timeout);
+  }, [mounted, visible]);
+
+  useEffect(() => {
+    if (visible && !mounted) {
+      return;
     }
 
     const animation = Animated.timing(progress, {
@@ -445,7 +453,7 @@ export function OfficialNotificationSheet({
     });
 
     return () => animation.stop();
-  }, [visible, progress, onClosed]);
+  }, [mounted, visible, progress, onClosed]);
 
   return (
     <Modal
@@ -496,7 +504,7 @@ export function OfficialNotificationSheet({
                 pressed && notificationSheetStyles.pressed,
               ]}
             >
-              <CloseIcon width={28} height={28} accessible={false} />
+              <CloseIcon width={28} height={28} />
             </Pressable>
           </View>
           <FlatList
@@ -544,11 +552,14 @@ export function OfficialNotificationDetailSheet({
   item: OfficialNotificationItem;
   onClosed: () => void;
 }) {
-  const progress = useRef(new Animated.Value(0)).current;
+  const [progress] = useState(() => new Animated.Value(0));
   const [closing, setClosing] = useState(false);
   const { height } = useWindowDimensions();
   const closedCallback = useRef(onClosed);
-  closedCallback.current = onClosed;
+
+  useEffect(() => {
+    closedCallback.current = onClosed;
+  }, [onClosed]);
 
   useEffect(() => {
     const animation = Animated.timing(progress, {
@@ -606,7 +617,7 @@ export function OfficialNotificationDetailSheet({
               accessibilityRole="button"
               accessibilityLabel="Close notification details"
             >
-              <CloseIcon width={28} height={28} accessible={false} />
+              <CloseIcon width={28} height={28} />
             </Pressable>
           </View>
           <ScrollView
@@ -628,7 +639,7 @@ export function OfficialNotificationDetailSheet({
             </Text>
             <View style={notificationDetailStyles.details}>
               <View style={notificationDetailStyles.row}>
-                <Building width={43} height={40} accessible={false} />
+                <Building width={43} height={40} />
                 <View style={notificationDetailStyles.copy}>
                   <Text style={[notificationDetailStyles.building, notificationDetailStyles.regularFont]}>
                     {item.buildingName ?? "UMVC Campus"}
@@ -639,7 +650,7 @@ export function OfficialNotificationDetailSheet({
                 </View>
               </View>
               <View style={notificationDetailStyles.row}>
-                <Calendar width={43} height={40} accessible={false} />
+                <Calendar width={43} height={40} />
                 <Text style={[notificationDetailStyles.time, notificationDetailStyles.regularFont]}>
                   {item.time}
                 </Text>

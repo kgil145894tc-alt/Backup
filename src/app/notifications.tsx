@@ -86,7 +86,7 @@ export default function NotificationsScreen() {
               onPress={close}
               style={({ pressed }) => [styles.closeButton, pressed && styles.pressed]}
             >
-              <CloseIcon width={30} height={30} accessible={false} />
+              <CloseIcon width={30} height={30} />
             </Pressable>
           </View>
         </SafeAreaView>

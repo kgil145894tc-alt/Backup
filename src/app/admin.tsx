@@ -49,7 +49,6 @@ import {
   updateRoom,
 } from "../services/firestoreData";
 import {
-  clearAdminLocations,
   getAdminLocationKey,
   initialAdminLocations,
   saveAdminLocations,
@@ -57,7 +56,6 @@ import {
 } from "../utils/adminLocations";
 import {
   applyAdminRoomEdits,
-  clearAdminRoomEdits,
   getAdminRoomKey,
   saveAdminRoomEdits,
 } from "../utils/adminRooms";
@@ -277,17 +275,6 @@ export default function AdminScreen() {
     setSaveMessage("Saving locally and syncing to Firestore...");
     void saveAdminLocations(nextLocations);
     void syncLocationToFirestore(editingLocation);
-  };
-
-  const resetLocalChanges = () => {
-    setLocations(initialAdminLocations);
-    setEditingLocation(null);
-    setRoomLocation(null);
-    setEditingRoom(null);
-    setRoomEdits({});
-    setSaveMessage("Local admin changes reset.");
-    void clearAdminLocations();
-    void clearAdminRoomEdits();
   };
 
   const syncRoomToFirestore = async (room: BuildingRoom) => {
@@ -791,6 +778,11 @@ export default function AdminScreen() {
                   ? "Manage campus buildings, rooms, and location details."
                   : "Review published notifications and map data updates."}
               </Text>
+              {saveMessage ? (
+                <Text accessibilityLiveRegion="polite" style={styles.saveMessage}>
+                  {saveMessage}
+                </Text>
+              ) : null}
             </View>
           </View>
 

@@ -1,7 +1,13 @@
 import { router, useFocusEffect } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useMemo, useRef, useState } from "react";
-import { FlatList, Pressable, Text, View, useWindowDimensions } from "react-native";
+import {
+  FlatList,
+  Pressable,
+  Text,
+  View,
+  useWindowDimensions,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import {
@@ -9,104 +15,35 @@ import {
   OfficialCategoryCard,
   type OfficialCategoryItem,
 } from "@/components/OfficialDesign";
-import Academic from "../../../assets/design/icons/academic.svg";
+import ProtectedAccess from "@/components/ProtectedAccess";
+import { navigateToTab } from "@/utils/navigation";
 import Background from "../../../assets/design/backgrounds/fifthBg.svg";
 import BackArrow from "../../../assets/design/icons/back-arrow.svg";
-import Facilities from "../../../assets/design/icons/facilities-cog.svg";
-import Food from "../../../assets/design/icons/food.svg";
-import Offices from "../../../assets/design/icons/offices.svg";
-import OtherBuildings from "../../../assets/design/icons/other-building.svg";
-import Services from "../../../assets/design/icons/services.svg";
-import ProtectedAccess from "@/components/ProtectedAccess";
+import {
+  categoryPresentation,
+  fallbackCategoryPresentation,
+  sortCategoriesByPreferredOrder,
+  toCategoryId,
+} from "../../constants/campusPresentation";
 import { loadCampusData } from "../../services/campusDataStore";
-import { initialAdminLocations, type AdminLocation } from "../../utils/adminLocations";
-import { navigateToTab } from "@/utils/navigation";
 import { styles } from "../../styles/official/categoriesScreen.styles";
+import {
+  initialAdminLocations,
+  type AdminLocation,
+} from "../../utils/adminLocations";
 
 type CategoryCardConfig = OfficialCategoryItem & {
   mapCategory: string;
 };
-
-const categoryImages = {
-  academic: require("../../../assets/design/locations/category-academic.png"),
-  admin: require("../../../assets/design/locations/category-admin.png"),
-  cafeteria: require("../../../assets/design/locations/cafeteria.png"),
-  facilities: require("../../../assets/design/locations/category-facilities.png"),
-  faculty: require("../../../assets/design/locations/teachers-faculty.png"),
-  laboratory: require("../../../assets/design/locations/new-building.png"),
-  other: require("../../../assets/design/locations/category-other.png"),
-};
-
-const categoryPresentation = {
-  Building: {
-    color: "#AF2532",
-    image: categoryImages.academic,
-    Icon: OtherBuildings,
-  },
-  Facility: {
-    color: "#1EAB58",
-    image: categoryImages.facilities,
-    Icon: Facilities,
-  },
-  Faculty: {
-    color: "#7B4FC9",
-    image: categoryImages.faculty,
-    Icon: Academic,
-  },
-  Food: {
-    color: "#FA5D0E",
-    image: categoryImages.cafeteria,
-    Icon: Food,
-  },
-  Laboratory: {
-    color: "#208AEF",
-    image: categoryImages.laboratory,
-    Icon: Academic,
-  },
-  Office: {
-    color: "#FEBF1F",
-    image: categoryImages.admin,
-    Icon: Offices,
-  },
-  Room: {
-    color: "#AF2532",
-    image: categoryImages.academic,
-    Icon: Academic,
-  },
-  Security: {
-    color: "#2F4858",
-    image: categoryImages.other,
-    Icon: Services,
-  },
-};
-
-const fallbackCategoryPresentation = {
-  color: "#6C757D",
-  image: categoryImages.other,
-  Icon: OtherBuildings,
-};
-
-const preferredCategoryOrder = [
-  "Building",
-  "Room",
-  "Laboratory",
-  "Faculty",
-  "Office",
-  "Facility",
-  "Food",
-  "Security",
-];
-
-function toCategoryId(category: string) {
-  return category.toLowerCase().replace(/[^a-z0-9]+/g, "-");
-}
 
 export default function Categories() {
   const listRef = useRef<FlatList<CategoryCardConfig>>(null);
   const { width } = useWindowDimensions();
   const isCompact = width < 380;
   const numColumns = isCompact ? 1 : 2;
-  const [mapFeatures, setMapFeatures] = useState<AdminLocation[]>(initialAdminLocations);
+  const [mapFeatures, setMapFeatures] = useState<AdminLocation[]>(
+    initialAdminLocations,
+  );
 
   useFocusEffect(
     useCallback(() => {
@@ -129,25 +66,11 @@ export default function Categories() {
       counts.set(feature.category, (counts.get(feature.category) ?? 0) + 1);
     });
 
-    const sortedCategories = [...counts.keys()].sort((first, second) => {
-      const firstIndex = preferredCategoryOrder.indexOf(first);
-      const secondIndex = preferredCategoryOrder.indexOf(second);
-
-      if (firstIndex !== -1 || secondIndex !== -1) {
-        return (
-          (firstIndex === -1 ? Number.MAX_SAFE_INTEGER : firstIndex) -
-          (secondIndex === -1 ? Number.MAX_SAFE_INTEGER : secondIndex)
-        );
-      }
-
-      return first.localeCompare(second);
-    });
+    const sortedCategories = sortCategoriesByPreferredOrder([...counts.keys()]);
 
     return sortedCategories.map((category) => {
       const presentation =
-        categoryPresentation[
-          category as keyof typeof categoryPresentation
-        ] ?? fallbackCategoryPresentation;
+        categoryPresentation[category] ?? fallbackCategoryPresentation;
 
       return {
         id: toCategoryId(category),
@@ -170,7 +93,8 @@ export default function Categories() {
   const navigate = (name: string) => {
     navigateToTab(name, {
       currentTab: "Categories",
-      onSameTab: () => listRef.current?.scrollToOffset({ offset: 0, animated: true }),
+      onSameTab: () =>
+        listRef.current?.scrollToOffset({ offset: 0, animated: true }),
     });
   };
 
@@ -186,10 +110,12 @@ export default function Categories() {
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Go back"
-              onPress={() => (router.canGoBack() ? router.back() : router.replace("/(tabs)"))}
+              onPress={() =>
+                router.canGoBack() ? router.back() : router.replace("/(tabs)")
+              }
               style={styles.backButton}
             >
-              <BackArrow width={32} height={32} accessible={false} />
+              <BackArrow width={32} height={32} />
             </Pressable>
             <Text style={styles.title}>Categories</Text>
           </View>
@@ -210,15 +136,17 @@ export default function Categories() {
               <OfficialCategoryCard
                 item={item}
                 Icon={
-                  categoryPresentation[
-                    item.mapCategory as keyof typeof categoryPresentation
-                  ]?.Icon ?? fallbackCategoryPresentation.Icon
+                  categoryPresentation[item.mapCategory]?.Icon ??
+                  fallbackCategoryPresentation.Icon
                 }
                 onPress={() => openCategoryOnMap(item)}
               />
             )}
           />
-          <OfficialBottomNavigation activeItem="Categories" onSelect={navigate} />
+          <OfficialBottomNavigation
+            activeItem="Categories"
+            onSelect={navigate}
+          />
         </SafeAreaView>
       </View>
     </ProtectedAccess>

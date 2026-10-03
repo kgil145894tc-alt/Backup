@@ -316,9 +316,9 @@ export default function ProfileScreen() {
             </Text>
             <View style={styles.badge}>
               {isGuest ? (
-                <UserIcon width={17} height={17} accessible={false} />
+                <UserIcon width={17} height={17} />
               ) : (
-                <Google width={17} height={17} accessible={false} />
+                <Google width={17} height={17} />
               )}
               <Text style={[styles.badgeText, styles.mediumFont]}>
                 {isGuest ? "GUEST MODE" : "SIGNED IN"}
@@ -383,7 +383,7 @@ export default function ProfileScreen() {
             </Pressable>
 
             <View style={styles.logoutIconCircle}>
-              <LogoutIcon width={42} height={42} accessible={false} />
+              <LogoutIcon width={42} height={42} />
             </View>
 
             <Text style={[styles.logoutModalTitle, styles.nameFont]}>

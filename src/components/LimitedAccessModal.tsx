@@ -34,7 +34,7 @@ export default function LimitedAccessModal({
             <Text style={styles.closeText}>x</Text>
           </Pressable>
 
-          <View style={styles.iconCircle} accessible={false}>
+          <View style={styles.iconCircle}>
             <View style={styles.lockShackle} />
             <View style={styles.lockBody}>
               <View style={styles.lockKeyhole} />

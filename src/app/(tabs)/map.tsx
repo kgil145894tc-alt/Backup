@@ -4,7 +4,7 @@ import {
   useLocalSearchParams,
 } from "expo-router";
 import * as Location from "expo-location";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Animated,
@@ -107,6 +107,16 @@ function isLocationInsideCampus(location: CurrentMapLocation) {
   return isInside;
 }
 
+function toCurrentMapLocation(
+  position: Location.LocationObject,
+): CurrentMapLocation {
+  return {
+    latitude: position.coords.latitude,
+    longitude: position.coords.longitude,
+    accuracy: position.coords.accuracy,
+  };
+}
+
 export default function MapScreen() {
   const insets = useSafeAreaInsets();
   const { featureId, featureType, category, locateOnly } = useLocalSearchParams<{
@@ -120,6 +130,9 @@ export default function MapScreen() {
   const shouldOpenInitialSheet = locateOnly !== "1";
   const headerHeight = rs(65, 58, 68);
   const noticeTop = insets.top + headerHeight + rs(10, 8, 12);
+  const buildingSheetTopClearance =
+    insets.top + headerHeight + rs(12, 10, 14);
+  const bottomNavigationClearance = insets.bottom + rs(82, 72, 88);
   const [mapFeatures, setMapFeatures] =
     useState<AdminLocation[]>(initialAdminLocations);
   const [roomEdits, setRoomEdits] = useState<Record<string, BuildingRoom>>({});
@@ -147,12 +160,9 @@ export default function MapScreen() {
   const [campusNoticeRequest, setCampusNoticeRequest] = useState(0);
   const [currentLocationFocusRequest, setCurrentLocationFocusRequest] =
     useState(0);
-  const mapNoticeOpacity = useRef(new Animated.Value(0)).current;
-  const buildingSheetProgress = useRef(new Animated.Value(1)).current;
-  const currentLocationAccuracy =
-    Platform.OS === "android"
-      ? Location.Accuracy.Balanced
-      : Location.Accuracy.BestForNavigation;
+  const [mapNoticeOpacity] = useState(() => new Animated.Value(0));
+  const [buildingSheetProgress] = useState(() => new Animated.Value(1));
+  const currentLocationAccuracy = Location.Accuracy.BestForNavigation;
 
   const campusLocationNotice = useMemo(() => {
     if (!currentLocation) {
@@ -247,12 +257,13 @@ export default function MapScreen() {
   );
 
   useEffect(() => {
-    if (!shouldOpenInitialSheet) {
-      setSelectedFeature(undefined);
-      return;
-    }
+    const timeout = setTimeout(() => {
+      setSelectedFeature(
+        shouldOpenInitialSheet ? initialSelectedFeature : undefined,
+      );
+    }, 0);
 
-    setSelectedFeature(initialSelectedFeature);
+    return () => clearTimeout(timeout);
   }, [initialSelectedFeature, shouldOpenInitialSheet]);
 
   useEffect(() => {
@@ -390,24 +401,19 @@ export default function MapScreen() {
           return;
         }
 
-        setCurrentLocation({
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-          accuracy: position.coords.accuracy,
-        });
+        setLocationError(undefined);
+        setCurrentLocation(toCurrentMapLocation(position));
 
         locationSubscription = await Location.watchPositionAsync(
           {
             accuracy: currentLocationAccuracy,
-            distanceInterval: Platform.OS === "android" ? 5 : 1,
-            timeInterval: Platform.OS === "android" ? 3000 : 1000,
+            distanceInterval: 1,
+            mayShowUserSettingsDialog: true,
+            timeInterval: 1000,
           },
           (updatedPosition) => {
-            setCurrentLocation({
-              latitude: updatedPosition.coords.latitude,
-              longitude: updatedPosition.coords.longitude,
-              accuracy: updatedPosition.coords.accuracy,
-            });
+            setLocationError(undefined);
+            setCurrentLocation(toCurrentMapLocation(updatedPosition));
           },
         );
 
@@ -440,7 +446,7 @@ export default function MapScreen() {
             onPress={() => navigate("Categories")}
             style={styles.filterButton}
           >
-            <FilterIcon width={26} height={29} accessible={false} />
+            <FilterIcon width={26} height={29} />
           </Pressable>
         </View>
       </SafeAreaView>
@@ -469,7 +475,7 @@ export default function MapScreen() {
         </View>
       ) : null}
 
-      {mapNotice ? (
+      {mapNotice && !selectedFeature ? (
         <Animated.View
           style={[
             styles.locationStatus,
@@ -499,7 +505,13 @@ export default function MapScreen() {
         <View
           style={[
             styles.sheetOverlay,
-            !selectedFeatureUsesRoomModal && styles.buildingSheetOverlay,
+            !selectedFeatureUsesRoomModal && [
+              styles.buildingSheetOverlay,
+              {
+                paddingBottom: bottomNavigationClearance,
+                paddingTop: buildingSheetTopClearance,
+              },
+            ],
           ]}
         >
           <Pressable
@@ -523,7 +535,7 @@ export default function MapScreen() {
                   style={styles.roomModalClose}
                   onPress={closeFeatureSheet}
                 >
-                  <CloseIcon width={36} height={36} accessible={false} />
+                  <CloseIcon width={36} height={36} />
                 </Pressable>
                 <ScrollView
                   nestedScrollEnabled
@@ -600,7 +612,7 @@ export default function MapScreen() {
                 style={styles.buildingSheetClose}
                 onPress={closeFeatureSheet}
               >
-                <CloseIcon width={30} height={30} accessible={false} />
+                <CloseIcon width={30} height={30} />
               </Pressable>
               <ScrollView
                 showsVerticalScrollIndicator={false}
@@ -854,8 +866,6 @@ const styles = StyleSheet.create({
   buildingSheetOverlay: {
     justifyContent: "flex-end",
     paddingHorizontal: rs(7, 5, 10),
-    paddingTop: rs(42, 34, 48),
-    paddingBottom: 0,
   },
 
   sheetBackdrop: {
@@ -870,7 +880,7 @@ const styles = StyleSheet.create({
 
   buildingSheet: {
     alignSelf: "center",
-    maxHeight: "82%",
+    maxHeight: "100%",
     maxWidth: 426,
     width: "100%",
     zIndex: 1,
@@ -893,7 +903,7 @@ const styles = StyleSheet.create({
 
   buildingSheetScroll: {
     paddingHorizontal: 7,
-    paddingBottom: rs(18, 14, 22),
+    paddingBottom: rs(24, 18, 28),
   },
 
   buildingPreview: {

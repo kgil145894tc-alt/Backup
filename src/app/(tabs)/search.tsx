@@ -22,6 +22,7 @@ import {
 import Background from "../../../assets/design/backgrounds/fourthBg.svg";
 import BackArrow from "../../../assets/design/icons/back-arrow.svg";
 import ProtectedAccess from "@/components/ProtectedAccess";
+import { getLocationImage } from "@/constants/campusPresentation";
 import { loadCampusData } from "../../services/campusDataStore";
 import { getCurrentHistory, saveCurrentHistoryItem } from "../../utils/guestHistory";
 import type { GuestHistoryItem, SaveGuestHistoryItem } from "../../utils/guestHistory";
@@ -34,31 +35,6 @@ type SearchFeatureItem = SaveGuestHistoryItem & {
   floor?: string;
   floors?: number | string;
 };
-
-const locationImages = {
-  academic: require("../../../assets/design/locations/category-academic.png"),
-  admin: require("../../../assets/design/locations/category-admin.png"),
-  cafeteria: require("../../../assets/design/locations/cafeteria.png"),
-  clinic: require("../../../assets/design/locations/clinic.png"),
-  default: require("../../../assets/design/locations/old-building.png"),
-  facilities: require("../../../assets/design/locations/category-facilities.png"),
-  library: require("../../../assets/design/locations/library.png"),
-  newBuilding: require("../../../assets/design/locations/new-building.png"),
-};
-
-function getLocationImage(item: Pick<SearchResultItem, "category" | "name">) {
-  const name = item.name.toLowerCase();
-  const category = item.category.toLowerCase();
-
-  if (name.includes("cafeteria")) return locationImages.cafeteria;
-  if (name.includes("clinic")) return locationImages.clinic;
-  if (name.includes("library")) return locationImages.library;
-  if (name.includes("new") || name.includes("building 2")) return locationImages.newBuilding;
-  if (category.includes("academic") || category.includes("room")) return locationImages.academic;
-  if (category.includes("office") || category.includes("admin")) return locationImages.admin;
-  if (category.includes("facilit")) return locationImages.facilities;
-  return locationImages.default;
-}
 
 function toLocationCardItem(item: SearchResultItem): OfficialLocationItem {
   const feature = item as SearchFeatureItem;
@@ -73,7 +49,7 @@ function toLocationCardItem(item: SearchResultItem): OfficialLocationItem {
 
 export default function SearchScreen() {
   const inputRef = useRef<TextInput>(null);
-  const searchEnterProgress = useRef(new Animated.Value(0)).current;
+  const [searchEnterProgress] = useState(() => new Animated.Value(0));
   const { focusSearch, focusAt } = useLocalSearchParams<{
     focusSearch?: string;
     focusAt?: string;
@@ -126,6 +102,9 @@ export default function SearchScreen() {
   useFocusEffect(
     useCallback(() => {
       let isActive = true;
+      // The home screen sends a fresh timestamp when the current Search tab
+      // should re-open with the keyboard focused.
+      void focusAt;
 
       runSearchSlideUp();
       if (focusSearch === "1") {
@@ -223,7 +202,7 @@ export default function SearchScreen() {
                   onPress={() => (router.canGoBack() ? router.back() : router.replace("/(tabs)"))}
                   style={styles.backButton}
                 >
-                  <BackArrow width={32} height={32} accessible={false} />
+                  <BackArrow width={32} height={32} />
                 </Pressable>
                 <Text style={styles.title}>Search</Text>
               </View>

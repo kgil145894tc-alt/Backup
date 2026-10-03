@@ -3,7 +3,6 @@ import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
 import {
-  ActivityIndicator,
   Alert,
   Keyboard,
   Platform,
@@ -277,12 +276,11 @@ export default function LoginScreen() {
     <View style={styles.screen}>
       <StatusBar hidden />
 
-      <View style={styles.background} pointerEvents="none" accessible={false}>
+      <View style={styles.background} pointerEvents="none">
         <LoginBackground
           width="100%"
           height="100%"
           preserveAspectRatio="none"
-          accessible={false}
         />
       </View>
 
@@ -493,7 +491,6 @@ export default function LoginScreen() {
               width={35}
               height={35}
               style={styles.googleIcon}
-              accessible={false}
             />
             <Text style={[styles.buttonText, styles.googleText]}>
               {isGoogleLoading ? "Signing in..." : "Continue with Google"}
@@ -519,7 +516,7 @@ export default function LoginScreen() {
             });
           }}
         >
-          <GuestIcon width={21} height={23} accessible={false} />
+          <GuestIcon width={21} height={23} />
           <Text style={[styles.buttonText, styles.guestText]}>
             Continue as Guest
           </Text>

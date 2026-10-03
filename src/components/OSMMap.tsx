@@ -43,6 +43,7 @@ export default function OSMMap({
   onMapReady,
 }: OSMMapProps) {
   const webViewRef = useRef<ElementRef<typeof WebView>>(null);
+  const lastCurrentLocationFocusRequest = useRef(currentLocationFocusRequest);
   const isAndroid = Platform.OS === "android";
 
   const boundaryCoordinates = campusBoundary
@@ -61,9 +62,15 @@ export default function OSMMap({
   }, [currentLocation]);
 
   useEffect(() => {
-    if (!currentLocation || currentLocationFocusRequest === 0) {
+    if (
+      !currentLocation ||
+      currentLocationFocusRequest === 0 ||
+      currentLocationFocusRequest === lastCurrentLocationFocusRequest.current
+    ) {
       return;
     }
+
+    lastCurrentLocationFocusRequest.current = currentLocationFocusRequest;
 
     webViewRef.current?.injectJavaScript(`
       window.focusCurrentLocation(${JSON.stringify(currentLocation)});
@@ -371,14 +378,14 @@ export default function OSMMap({
           function smoothFocusBounds(bounds, options) {
             const focusOptions = Object.assign(
               {
-                animate: true,
+                animate: ${JSON.stringify(!isAndroid)},
                 duration: 1.25,
                 easeLinearity: 0.18
               },
               options || {}
             );
 
-            if (map.flyToBounds) {
+            if (${JSON.stringify(!isAndroid)} && map.flyToBounds) {
               map.flyToBounds(bounds, focusOptions);
               return;
             }
@@ -386,6 +393,20 @@ export default function OSMMap({
             map.fitBounds(bounds, focusOptions);
           }
 
+          function smoothFocusCenter(center, zoom) {
+            const focusOptions = {
+              animate: true,
+              duration: 0.75,
+              easeLinearity: 0.25
+            };
+
+            if (map.flyTo) {
+              map.flyTo(center, zoom, focusOptions);
+              return;
+            }
+
+            map.setView(center, zoom, focusOptions);
+          }
 
           /*
            * ==========================
@@ -508,6 +529,7 @@ const benchCollection =
           const roomLabelLayers = [];
           const roomLabelMinZoom = 20;
           let activeFeatureKey = selectedFeatureKey;
+          let pendingSelectedMarker = null;
 
           function getFeatureKey(feature) {
             const properties = feature.properties || {};
@@ -699,6 +721,8 @@ const benchCollection =
             fillOpacity: 0.76
           };
 
+          const mapBearing = 232;
+
           const currentLocationIcon = L.divIcon({
             className: "campus-current-location-marker",
             html:
@@ -864,6 +888,61 @@ const benchCollection =
             }
           }
 
+          function addPendingSelectedMarker() {
+            if (!pendingSelectedMarker) {
+              return;
+            }
+
+            const addMarker = pendingSelectedMarker;
+            pendingSelectedMarker = null;
+            addMarker();
+          }
+
+          function addSelectedMarkerAfterFocus(delayMs) {
+            if (!pendingSelectedMarker) {
+              return;
+            }
+
+            let fallbackId = null;
+            let startFallbackId = null;
+            let isComplete = false;
+
+            function handleFocusEnd() {
+              if (isComplete) {
+                return;
+              }
+
+              isComplete = true;
+              map.off("movestart", handleFocusStart);
+              map.off("moveend", handleFocusEnd);
+
+              if (fallbackId) {
+                clearTimeout(fallbackId);
+              }
+
+              if (startFallbackId) {
+                clearTimeout(startFallbackId);
+              }
+
+              addPendingSelectedMarker();
+            }
+
+            function handleFocusStart() {
+              if (startFallbackId) {
+                clearTimeout(startFallbackId);
+              }
+
+              map.once("moveend", handleFocusEnd);
+              fallbackId = setTimeout(handleFocusEnd, delayMs);
+            }
+
+            map.once("movestart", handleFocusStart);
+            startFallbackId = setTimeout(function () {
+              map.off("movestart", handleFocusStart);
+              fallbackId = setTimeout(handleFocusEnd, delayMs);
+            }, 120);
+          }
+
           function bindFeature(
             feature,
             layer,
@@ -906,19 +985,21 @@ const benchCollection =
               layer.setStyle(selectedStyle);
 
               if (!openSelectedPopup && layer.getBounds) {
-                const marker = L.marker(
-                  layer.getBounds().getCenter(),
-                  {
-                    icon: categoryMarkerIcon,
-                    pane: "selected-marker-pane",
-                    zIndexOffset: 9000
-                  }
-                ).addTo(map);
+                pendingSelectedMarker = function () {
+                  const marker = L.marker(
+                    layer.getBounds().getCenter(),
+                    {
+                      icon: categoryMarkerIcon,
+                      pane: "selected-marker-pane",
+                      zIndexOffset: 9000
+                    }
+                  ).addTo(map);
 
-                marker.on("click", function () {
-                  postSelectedFeature(properties);
-                  selectFeatureLayer(featureKey);
-                });
+                  marker.on("click", function () {
+                    postSelectedFeature(properties);
+                    selectFeatureLayer(featureKey);
+                  });
+                };
               }
             }
 
@@ -1116,39 +1197,84 @@ const benchCollection =
             }
 
             if (selectedFeature.layer.getBounds) {
-              smoothFocusBounds(
-                selectedFeature.layer.getBounds(),
-                {
-                  padding: [60, 60],
-                  maxZoom: 20
-                }
-              );
+              const selectedBounds = selectedFeature.layer.getBounds();
+              if (selectedFeatureType === "building") {
+                addSelectedMarkerAfterFocus(2200);
+                smoothFocusBounds(
+                  selectedBounds,
+                  {
+                    padding: [60, 60],
+                    maxZoom: 20
+                  }
+                );
+              } else {
+                addSelectedMarkerAfterFocus(1800);
+                smoothFocusCenter(selectedBounds.getCenter(), 20);
+              }
+            } else {
+              addPendingSelectedMarker();
             }
 
+          }
+
+          function applyDefaultCampusView() {
+            map.fitBounds(
+              campusBounds,
+              {
+                padding: [8, 8],
+                maxZoom: 20,
+                animate: false
+              }
+            );
+
+            map.setZoom(
+              Math.min(map.getZoom() + 1, 21),
+              {
+                animate: false
+              }
+            );
+          }
+
+          function prepareSelectedFeatureStartView() {
+            if (!selectedFeatureKey) {
+              return false;
+            }
+
+            const selectedFeature =
+              featureLayers[selectedFeatureKey];
+
+            if (!selectedFeature || !selectedFeature.layer.getBounds) {
+              return false;
+            }
+
+            const selectedBounds = selectedFeature.layer.getBounds();
+
+            if (selectedFeatureType === "building") {
+              map.fitBounds(
+                selectedBounds,
+                {
+                  padding: [60, 60],
+                  maxZoom: 18,
+                  animate: false
+                }
+              );
+              return true;
+            }
+
+            map.setView(
+              selectedBounds.getCenter(),
+              19,
+              {
+                animate: false
+              }
+            );
+            return true;
           }
 
           function focusSelectedCategory() {
             if (!selectedCategory || !categoryFeatureBounds.length) {
               return;
             }
-
-            const bounds = categoryFeatureBounds.reduce(
-              function (nextBounds, featureBounds) {
-                return nextBounds.extend(featureBounds);
-              },
-              L.latLngBounds(
-                categoryFeatureBounds[0].getSouthWest(),
-                categoryFeatureBounds[0].getNorthEast()
-              )
-            );
-
-            smoothFocusBounds(
-              bounds,
-              {
-                padding: [70, 70],
-                maxZoom: 20
-              }
-            );
           }
 
 
@@ -1159,7 +1285,10 @@ const benchCollection =
            */
 
           setTimeout(() => {
-            map.invalidateSize();
+            map.invalidateSize({
+              animate: false,
+              pan: false
+            });
 
             map.setMaxBounds(
               paddedCampusBounds
@@ -1176,30 +1305,22 @@ const benchCollection =
               )
             );
 
-            map.fitBounds(
-              campusBounds,
-              {
-                padding: [8, 8],
-                maxZoom: 20
-              }
-            );
-
-            map.setZoom(
-              Math.min(map.getZoom() + 1, 21)
-            );
-
             if (map.setBearing) {
-              map.setBearing(232);
+              map.setBearing(mapBearing);
             }
 
             updateRoomLabels();
             if (selectedFeatureKey) {
-              focusSelectedFeature();
+              prepareSelectedFeatureStartView();
+              requestAnimationFrame(function () {
+                focusSelectedFeature();
+                postMapReady();
+              });
             } else {
+              applyDefaultCampusView();
               focusSelectedCategory();
+              postMapReady();
             }
-
-            postMapReady();
           }, 500);
 
         </script>

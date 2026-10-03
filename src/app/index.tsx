@@ -66,12 +66,11 @@ export default function WelcomeScreen() {
     <View style={styles.screen}>
       <StatusBar hidden />
 
-      <View style={styles.background} pointerEvents="none" accessible={false}>
+      <View style={styles.background} pointerEvents="none">
         <WelcomeBackground
           width="100%"
           height="100%"
           preserveAspectRatio="none"
-          accessible={false}
         />
       </View>
 
@@ -101,7 +100,6 @@ export default function WelcomeScreen() {
         <TitleDivider
           width={196}
           height={20}
-          accessible={false}
           style={styles.divider}
         />
 
@@ -118,7 +116,7 @@ export default function WelcomeScreen() {
           ]}
         >
           <Text style={styles.buttonText}>Get Started</Text>
-          <StartArrow width={26} height={15} accessible={false} />
+          <StartArrow width={26} height={15} />
         </Pressable>
       </ScrollView>
     </View>

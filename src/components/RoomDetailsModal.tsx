@@ -48,7 +48,7 @@ export default function RoomDetailsModal({
               onPress={onClose}
               style={styles.close}
             >
-              <CloseIcon width={36} height={36} accessible={false} />
+              <CloseIcon width={36} height={36} />
             </Pressable>
             <ScrollView
               nestedScrollEnabled
